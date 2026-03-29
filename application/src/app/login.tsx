@@ -33,7 +33,7 @@ GoogleSignin.configure({
 // LinkedIn only accepts HTTPS redirect URIs, so we use the server as intermediary.
 // Flow: App opens browser → server → LinkedIn → server callback → app deep link with JWT
 const LINKEDIN_START_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/auth/linkedin/start`;
-const APP_SCHEME = 'exp+hiringbull-nayak';
+const APP_SCHEME = __DEV__ ? 'exp+hiringbull-nayak' : 'hiringbull';
 
 /* ----------------------------- Screen ----------------------------- */
 

@@ -273,7 +273,10 @@ export const linkedinLogin = catchAsync(async (req, res) => {
 //
 
 const LINKEDIN_SCOPES = "openid profile email";
-const APP_DEEP_LINK = "exp+hiringbull-nayak://login";
+const IS_PRODUCTION = process.env.NODE_ENV === "production" || (process.env.SERVER_URL || "").includes("hiringbull.org");
+const APP_DEEP_LINK = IS_PRODUCTION
+  ? "hiringbull://login"
+  : "exp+hiringbull-nayak://login";
 
 /**
  * @swagger
