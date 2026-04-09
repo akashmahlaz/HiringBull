@@ -35,7 +35,7 @@ export function useNotificationObserver() {
       if (typeof url === 'string') {
         router.push(url as any);
       } else {
-        router.push('/(app)');
+        router.push('/');
       }
     }
   }, [lastNotificationResponse]);

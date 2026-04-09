@@ -1,7 +1,7 @@
 import { useAuth, getUserEmail } from '@/lib/auth';
 import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Alert, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import {
   initConnection,
@@ -9,6 +9,7 @@ import {
   fetchProducts,
   requestPurchase,
   finishTransaction,
+  getAvailablePurchases,
   purchaseUpdatedListener,
   purchaseErrorListener,
   ErrorCode,
@@ -19,7 +20,8 @@ import {
 
 import { SafeAreaView, Text, View } from '@/components/ui';
 import { client } from '@/api/common/client';
-import { saveMembership } from '@/lib/membership';
+import { getMembership, isMembershipValid, saveMembership } from '@/lib/membership';
+import { getUserInfo } from '@/features/users';
 
 const TAG = '[Payment]';
 
@@ -91,6 +93,32 @@ export default function PaymentScreen() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [connectionReady, setConnectionReady] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [shouldNavigate, setShouldNavigate] = useState(false);
+  const [purchasedPlanId, setPurchasedPlanId] = useState<string | null>(null);
+  const purchaseProcessed = useRef(false);
+  const purchaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // On mount, check if user already has an active membership
+  useEffect(() => {
+    const membership = getMembership();
+    if (membership && isMembershipValid(membership.membershipEnd)) {
+      console.log(`${TAG} User already has active membership, navigating to /`);
+      router.replace('/');
+    }
+  }, []);
+
+  // Navigate via state change so router is never stale
+  // IMPORTANT: Use '/' not '/(app)' — group routes like (app) resolve incorrectly
+  // with Stack.Protected because path resolution picks the first empty-path match
+  // (e.g. onboarding) before guards are evaluated. Using '/' lets the root layout
+  // guards decide the correct screen, same as login.tsx does.
+  useEffect(() => {
+    if (shouldNavigate) {
+      console.log(`${TAG} Navigating to / via state trigger (guards will resolve to (app))`);
+      router.replace('/');
+    }
+  }, [shouldNavigate, router]);
 
   // ─── Initialize IAP connection ────────────────────────────
   useEffect(() => {
@@ -101,15 +129,25 @@ export default function PaymentScreen() {
       try {
         console.log(`${TAG} Initializing IAP connection...`);
         const result = await initConnection();
-        console.log(`${TAG} IAP connected:`, result);
+        console.log(`${TAG} IAP connected:`, JSON.stringify(result));
         setConnectionReady(true);
 
         // Fetch products from Google Play (in-app type only)
+        console.log(`${TAG} Fetching products with SKUs:`, JSON.stringify(productIds));
         const items = await fetchProducts({ skus: productIds, type: 'in-app' });
-        console.log(`${TAG} Products fetched:`, items?.length ?? 0);
+        console.log(`${TAG} Products fetched count:`, items?.length ?? 0);
+        console.log(`${TAG} Products fetched details:`, JSON.stringify(items, null, 2));
+        if (!items || items.length === 0) {
+          console.warn(`${TAG} WARNING: No products returned from Google Play! SKUs may not exist in Play Console.`);
+          console.warn(`${TAG} Requested SKUs: ${productIds.join(', ')}`);
+        } else {
+          items.forEach((item: any) => {
+            console.log(`${TAG} Product: id=${item.productId}, title=${item.title}, price=${item.localizedPrice}`);
+          });
+        }
         setProducts((items as Product[]) ?? []);
       } catch (err: any) {
-        console.error(`${TAG} IAP init error:`, err.message);
+        console.error(`${TAG} IAP init error:`, err.message, err.code, JSON.stringify(err));
         // In dev/emulator, IAP may not be available
         Alert.alert(
           'Store Unavailable',
@@ -125,6 +163,19 @@ export default function PaymentScreen() {
     // Listen for purchase updates (success)
     purchaseUpdateSub = purchaseUpdatedListener(async (purchase: Purchase) => {
       console.log(`${TAG} Purchase updated:`, purchase.productId);
+
+      // Prevent double-processing
+      if (purchaseProcessed.current) {
+        console.log(`${TAG} Purchase already processed, skipping`);
+        return;
+      }
+      purchaseProcessed.current = true;
+
+      // Clear the fallback timeout since listener fired
+      if (purchaseTimeoutRef.current) {
+        clearTimeout(purchaseTimeoutRef.current);
+        purchaseTimeoutRef.current = null;
+      }
 
       try {
         // Verify on our server
@@ -152,30 +203,35 @@ export default function PaymentScreen() {
             email: email || '',
             membershipEnd: membershipEnd.toISOString(),
           });
+          console.log(`${TAG} Membership saved, membershipEnd=${membershipEnd.toISOString()}`);
 
           // Finish/acknowledge the transaction on client side
-          await finishTransaction({ purchase, isConsumable: true });
-          console.log(`${TAG} Transaction finished`);
+          try {
+            await finishTransaction({ purchase, isConsumable: true });
+            console.log(`${TAG} Transaction finished`);
+          } catch (finishErr: any) {
+            console.warn(`${TAG} finishTransaction warning:`, finishErr.message);
+          }
 
-          Alert.alert(
-            'Membership Activated! 🎉',
-            `Your ${plan?.name || ''} plan is now active.`,
-            [{ text: 'Continue', onPress: () => router.replace('/(app)') }],
-          );
+          // Navigate immediately — don't wait for Alert interaction
+          setPurchasing(false);
+          setPurchasedPlanId(purchase.productId);
+          setShouldNavigate(true);
         } else {
           throw new Error('Server verification failed');
         }
       } catch (err: any) {
         console.error(`${TAG} Verify error:`, err.message);
+        purchaseProcessed.current = false; // Allow retry
         Alert.alert('Verification Failed', 'Payment was received but verification failed. Please contact support.');
-      } finally {
         setPurchasing(false);
       }
     });
 
     // Listen for purchase errors
     purchaseErrorSub = purchaseErrorListener((error: PurchaseError) => {
-      console.error(`${TAG} Purchase error:`, error.code, error.message);
+      console.error(`${TAG} Purchase error: code=${error.code}, message=${error.message}, debugMessage=${error.debugMessage}, responseCode=${error.responseCode}`);
+      console.error(`${TAG} Full purchase error:`, JSON.stringify(error));
       setPurchasing(false);
 
       if (error.code === ErrorCode.UserCancelled) {
@@ -183,15 +239,106 @@ export default function PaymentScreen() {
         return;
       }
 
-      Alert.alert('Purchase Failed', error.message || 'Something went wrong. Please try again.');
+      Alert.alert('Purchase Failed', `${error.message || 'Something went wrong.'}\n\nCode: ${error.code}\nSKU: ${error.productId || 'unknown'}`);
     });
 
     return () => {
       purchaseUpdateSub?.remove();
       purchaseErrorSub?.remove();
+      if (purchaseTimeoutRef.current) clearTimeout(purchaseTimeoutRef.current);
       endConnection();
     };
   }, []);
+
+  // ─── Restore existing purchases ───────────────────────────
+  const handleRestore = useCallback(async () => {
+    if (restoring) return;
+    setRestoring(true);
+    console.log(`${TAG} Restore: fetching owned purchases...`);
+
+    try {
+      const owned = await getAvailablePurchases();
+      console.log(`${TAG} Restore: found ${owned.length} owned purchases`);
+
+      if (owned.length === 0) {
+        Alert.alert('No Purchases Found', 'No previous purchases were found on this account.');
+        setRestoring(false);
+        return;
+      }
+
+      // Try to verify each owned purchase with the server
+      let verified = false;
+      for (const purchase of owned) {
+        console.log(`${TAG} Restore: trying to verify ${purchase.productId}, token length=${purchase.purchaseToken?.length}`);
+        try {
+          const response = await client.post('/api/payment/google-play/verify', {
+            purchaseToken: purchase.purchaseToken,
+            productId: purchase.productId,
+            packageName: ('packageNameAndroid' in purchase ? purchase.packageNameAndroid : null) || 'com.hiringbull',
+          });
+
+          if (response.data.success) {
+            console.log(`${TAG} Restore: server verified ${purchase.productId}`);
+            const plan = PLANS.find((p) => p.id === purchase.productId);
+            const daysMap: Record<string, number> = {
+              hb_starter_1mo: 30,
+              hb_growth_3mo: 90,
+              hb_pro_6mo: 180,
+            };
+            const days = daysMap[purchase.productId] || 30;
+            const membershipEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+            const email = getUserEmail();
+            saveMembership({
+              email: email || '',
+              membershipEnd: membershipEnd.toISOString(),
+            });
+            await finishTransaction({ purchase, isConsumable: true });
+            verified = true;
+            Alert.alert(
+              'Purchase Restored! 🎉',
+              `Your ${plan?.name || ''} plan is now active.`,
+              [{ text: 'Continue', onPress: () => setShouldNavigate(true) }],
+            );
+            break;
+          }
+        } catch (verifyErr: any) {
+          console.error(`${TAG} Restore: verify failed for ${purchase.productId}:`, verifyErr?.response?.data || verifyErr.message);
+        }
+      }
+
+      if (!verified) {
+        // Verification failed — offer to consume so they can re-purchase
+        Alert.alert(
+          'Verification Failed',
+          'Your previous purchase could not be verified. Would you like to clear it and try purchasing again?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Clear & Retry',
+              style: 'destructive',
+              onPress: async () => {
+                for (const purchase of owned) {
+                  try {
+                    console.log(`${TAG} Restore: consuming ${purchase.productId}`);
+                    await finishTransaction({ purchase, isConsumable: true });
+                    console.log(`${TAG} Restore: consumed ${purchase.productId}`);
+                  } catch (e: any) {
+                    console.error(`${TAG} Restore: consume failed:`, e.message);
+                  }
+                }
+                Alert.alert('Cleared', 'Previous purchases cleared. You can now purchase again.');
+              },
+            },
+          ],
+        );
+      }
+    } catch (err: any) {
+      console.error(`${TAG} Restore error:`, err.message);
+      Alert.alert('Restore Failed', err.message);
+    } finally {
+      setRestoring(false);
+    }
+  }, [restoring, products, connectionReady]);
 
   // ─── Handle purchase ──────────────────────────────────────
   const handlePurchase = useCallback(async () => {
@@ -201,9 +348,13 @@ export default function PaymentScreen() {
     if (!plan) return;
 
     console.log(`${TAG} Starting purchase for: ${plan.id}`);
+    console.log(`${TAG} Available products:`, products.map((p: any) => p.productId));
+    console.log(`${TAG} Connection ready: ${connectionReady}`);
+    purchaseProcessed.current = false;
     setPurchasing(true);
 
     try {
+      console.log(`${TAG} Calling requestPurchase with SKU: ${plan.id}`);
       await requestPurchase({
         type: 'in-app',
         request: {
@@ -211,9 +362,85 @@ export default function PaymentScreen() {
           apple: { sku: plan.id },
         },
       });
-      // The purchaseUpdatedListener will handle the result
+
+      // Fallback: if purchaseUpdatedListener doesn't fire within 30s, check server
+      purchaseTimeoutRef.current = setTimeout(async () => {
+        if (purchaseProcessed.current) return; // Already handled by listener
+        console.log(`${TAG} Listener timeout — checking server for membership...`);
+        try {
+          const userInfo = await getUserInfo();
+          const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
+          if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
+            console.log(`${TAG} Server confirms payment! Saving membership and navigating.`);
+            purchaseProcessed.current = true;
+            saveMembership({
+              email: userInfo.email,
+              membershipEnd: new Date(serverPlanEnd).toISOString(),
+            });
+            setPurchasing(false);
+            setPurchasedPlanId(plan.id);
+            setShouldNavigate(true);
+          } else {
+            console.log(`${TAG} Server shows no active membership yet, keeping user on payment screen.`);
+            setPurchasing(false);
+          }
+        } catch (e: any) {
+          console.warn(`${TAG} Fallback server check failed:`, e.message);
+          setPurchasing(false);
+        }
+      }, 30000);
     } catch (err: any) {
-      console.error(`${TAG} requestPurchase error:`, err.message);
+      console.error(`${TAG} requestPurchase error:`, err.message, err.code, JSON.stringify(err));
+
+      if (err.code === 'E_ALREADY_OWNED') {
+        // Product already owned but not consumed — check server and try to consume
+        console.log(`${TAG} E_ALREADY_OWNED — checking server for existing membership...`);
+        try {
+          const userInfo = await getUserInfo();
+          const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
+          if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
+            console.log(`${TAG} Server confirms active membership. Consuming old purchase and navigating.`);
+            purchaseProcessed.current = true;
+            saveMembership({
+              email: userInfo.email,
+              membershipEnd: new Date(serverPlanEnd).toISOString(),
+            });
+            // Try to consume the owned purchase so it doesn't block future purchases
+            try {
+              const owned = await getAvailablePurchases();
+              for (const p of owned) {
+                await finishTransaction({ purchase: p, isConsumable: true });
+                console.log(`${TAG} Consumed old purchase: ${p.productId}`);
+              }
+            } catch (consumeErr: any) {
+              console.warn(`${TAG} Could not consume old purchase:`, consumeErr.message);
+            }
+            setPurchasing(false);
+            setPurchasedPlanId(plan.id);
+            setShouldNavigate(true);
+            return;
+          }
+        } catch (serverErr: any) {
+          console.warn(`${TAG} Server check failed:`, serverErr.message);
+        }
+        // If server doesn't confirm, try to consume and retry
+        try {
+          console.log(`${TAG} Consuming old unverified purchase...`);
+          const owned = await getAvailablePurchases();
+          for (const p of owned) {
+            await finishTransaction({ purchase: p, isConsumable: true });
+            console.log(`${TAG} Consumed: ${p.productId}`);
+          }
+          setPurchasing(false);
+          Alert.alert('Previous Purchase Cleared', 'A previous unfinished purchase was found and cleared. Please try again.');
+        } catch (consumeErr: any) {
+          console.warn(`${TAG} Failed to consume:`, consumeErr.message);
+          setPurchasing(false);
+          Alert.alert('Purchase Issue', 'A previous purchase is blocking. Please contact support.');
+        }
+        return;
+      }
+
       setPurchasing(false);
 
       if (err.code !== ErrorCode.UserCancelled) {
@@ -268,9 +495,16 @@ export default function PaymentScreen() {
                   }`}
                 >
                   {/* Popular badge */}
-                  {plan.popular && (
+                  {plan.popular && !purchasedPlanId && (
                     <View className="absolute -top-3 right-4 rounded-full bg-blue-500 px-3 py-1">
                       <Text className="text-xs font-bold text-white">MOST POPULAR</Text>
+                    </View>
+                  )}
+
+                  {/* Purchased badge */}
+                  {purchasedPlanId === plan.id && (
+                    <View className="absolute -top-3 right-4 rounded-full bg-green-500 px-3 py-1">
+                      <Text className="text-xs font-bold text-white">✓ PURCHASED</Text>
                     </View>
                   )}
 
@@ -366,13 +600,20 @@ export default function PaymentScreen() {
           <View className="border-t border-neutral-200 px-5 pb-6 pt-4">
             <Pressable
               onPress={handlePurchase}
-              disabled={purchasing}
-              className={`rounded-xl py-4 ${purchasing ? 'bg-neutral-400' : 'bg-black'}`}
+              disabled={purchasing || !!purchasedPlanId}
+              className={`rounded-xl py-4 ${purchasing || purchasedPlanId ? 'bg-neutral-400' : 'bg-black'}`}
             >
               {purchasing ? (
                 <View className="flex-row items-center justify-center gap-2">
                   <ActivityIndicator size="small" color="white" />
                   <Text className="text-base font-bold text-white">Processing...</Text>
+                </View>
+              ) : purchasedPlanId ? (
+                <View className="flex-row items-center justify-center gap-2">
+                  <Ionicons name="checkmark-circle" size={20} color="white" />
+                  <Text className="text-base font-bold text-white">
+                    Plan Activated — Redirecting...
+                  </Text>
                 </View>
               ) : (
                 <Text className="text-center text-base font-bold text-white">

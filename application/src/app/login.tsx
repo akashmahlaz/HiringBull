@@ -24,15 +24,19 @@ import getOrCreateDeviceId from '@/utils/getOrCreatedId';
 WebBrowser.maybeCompleteAuthSession();
 
 /* ---------- Google Sign-In Configuration ---------- */
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB;
+console.log('[Login:Google:Config] webClientId =', GOOGLE_WEB_CLIENT_ID || '⚠️ UNDEFINED!');
+console.log('[Login:Google:Config] webClientId length =', GOOGLE_WEB_CLIENT_ID?.length || 0);
 GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+  webClientId: GOOGLE_WEB_CLIENT_ID,
   offlineAccess: false,
 });
 
 /* ---------- LinkedIn: server-side OAuth ---------- */
 // LinkedIn only accepts HTTPS redirect URIs, so we use the server as intermediary.
 // Flow: App opens browser → server → LinkedIn → server callback → app deep link with JWT
-const LINKEDIN_START_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/auth/linkedin/start`;
+// LinkedIn OAuth MUST use production HTTPS URL (LinkedIn rejects HTTP redirect URIs)
+const LINKEDIN_START_URL = `https://api.hiringbull.org/api/auth/linkedin/start`;
 const APP_SCHEME = __DEV__ ? 'exp+hiringbull-nayak' : 'hiringbull';
 
 /* ----------------------------- Screen ----------------------------- */
@@ -56,6 +60,7 @@ export default function Login() {
     registerDevice({
       deviceId,
       type: Platform.OS === 'ios' ? 'ios' : 'android',
+      token: ''
     });
     console.log('[Login:Nav] About to router.replace("/") — root layout will decide where to go');
     router.replace('/');
@@ -66,20 +71,32 @@ export default function Login() {
   const handleGoogleSignIn = async () => {
     showGlobalLoading();
     setError('');
+    console.log('[Login:Google] ====== SIGN-IN ATTEMPT ======');
+    console.log('[Login:Google] webClientId configured:', GOOGLE_WEB_CLIENT_ID ? `${GOOGLE_WEB_CLIENT_ID.substring(0, 20)}...` : '⚠️ UNDEFINED');
     try {
-      await GoogleSignin.hasPlayServices();
+      console.log('[Login:Google] Checking Play Services...');
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      console.log('[Login:Google] Play Services OK, calling signIn()...');
       const response = await GoogleSignin.signIn();
-      console.log('[Login:Google] Native sign-in success, getting idToken...');
+      console.log('[Login:Google] Native sign-in response type:', response?.type);
+      console.log('[Login:Google] Native sign-in response keys:', Object.keys(response || {}));
+      console.log('[Login:Google] response.data keys:', Object.keys(response?.data || {}));
       const idToken = response.data?.idToken;
+      console.log('[Login:Google] idToken present:', !!idToken, 'length:', idToken?.length || 0);
       if (!idToken) {
         throw new Error('No ID token returned from Google');
       }
       console.log('[Login:Google] Sending idToken to server...');
       const { data } = await client.post('/api/auth/google', { idToken });
-      console.log('[Login:Google] Success, userId:', data.user?.id);
+      console.log('[Login:Google] Server response:', data.user?.id);
       await signIn(data.token);
       await registerDeviceAndNavigate();
     } catch (err: any) {
+      console.error('[Login:Google] ====== ERROR ======');
+      console.error('[Login:Google] Error name:', err?.name);
+      console.error('[Login:Google] Error message:', err?.message);
+      console.error('[Login:Google] Error code:', err?.code);
+      console.error('[Login:Google] Full error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
       if (isErrorWithCode(err)) {
         switch (err.code) {
           case statusCodes.SIGN_IN_CANCELLED:
@@ -92,11 +109,11 @@ export default function Login() {
             setError('Google Play Services not available');
             break;
           default:
-            console.error('[Login:Google] Error code:', err.code, err.message);
-            setError(err?.response?.data?.error || 'Google sign-in failed');
+            console.error('[Login:Google] Unhandled error code:', err.code);
+            setError(err?.response?.data?.error || `Google sign-in failed (${err.code})`);
         }
       } else {
-        console.error('[Login:Google] Failed:', err?.response?.data || err.message);
+        console.error('[Login:Google] Non-Google error:', err?.response?.data || err.message);
         setError(err?.response?.data?.error || 'Google sign-in failed');
       }
     } finally {

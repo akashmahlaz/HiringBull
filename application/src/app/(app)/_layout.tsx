@@ -7,9 +7,9 @@ import { useColorScheme } from 'nativewind';
 import React, { useEffect, useRef } from 'react';
 import { AppState, Platform, View } from 'react-native';
 
-import { updatePushToken } from '@/features/users';
+import { getUserInfo, updatePushToken } from '@/features/users';
 import { useSingleDeviceSessionGuard } from '@/lib/hooks/useSingleDeviceSessionGuard';
-import { getMembership, isMembershipValid } from '@/lib/membership';
+import { getMembership, isMembershipValid, saveMembership } from '@/lib/membership';
 import getOrCreateDeviceId from '@/utils/getOrCreatedId';
 
 import DeviceConflict from './outreach/deviceConflict';
@@ -21,24 +21,37 @@ export default function TabLayout() {
   const queryClient = useQueryClient();
   const router = useRouter();
   useEffect(() => {
-    const membershipData = getMembership();
-    console.log('[TabLayout] Mount: membershipData =', JSON.stringify(membershipData));
-    // Redirect to no-membership if:
-    // - No membership data at all (new user who hasn't purchased)
-    // - Membership data exists but is expired
-    if (!membershipData) {
-      console.log('[TabLayout] No membership data → redirecting to /no-membership');
-      router.replace('/no-membership');
-      return;
-    }
-    const isValid = isMembershipValid(membershipData.membershipEnd);
-    console.log('[TabLayout] Membership valid =', isValid, '| membershipEnd =', membershipData.membershipEnd);
-    if (!isValid) {
-      console.log('[TabLayout] Membership expired → redirecting to /no-membership');
-      router.replace('/no-membership');
-      return;
-    }
-    console.log('[TabLayout] Membership is valid, staying in (app)');
+    const checkMembership = async () => {
+      let membershipData = getMembership();
+      console.log('[TabLayout] Mount: membershipData =', JSON.stringify(membershipData));
+
+      // If local membership is missing or expired, try restoring from server
+      if (!membershipData || !isMembershipValid(membershipData.membershipEnd)) {
+        console.log('[TabLayout] Local membership missing/expired, checking server...');
+        try {
+          const userInfo = await getUserInfo();
+          const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
+          if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
+            saveMembership({
+              email: userInfo.email,
+              membershipEnd: new Date(serverPlanEnd).toISOString(),
+            });
+            console.log('[TabLayout] Membership restored from server, expires', serverPlanEnd);
+            return; // Stay in (app)
+          }
+        } catch (e: any) {
+          console.warn('[TabLayout] Failed to check server membership:', e.message);
+        }
+
+        console.log('[TabLayout] No valid membership → redirecting to /no-membership');
+        router.replace('/no-membership');
+        return;
+      }
+
+      console.log('[TabLayout] Membership is valid, staying in (app)');
+    };
+
+    checkMembership();
   }, []);
   useEffect(() => {
     const subscription = AppState.addEventListener(
@@ -54,8 +67,24 @@ export default function TabLayout() {
             !membershipData ||
             !isMembershipValid(membershipData.membershipEnd)
           ) {
-            router.replace('/no-membership');
-            return;
+            // Try server before kicking out
+            try {
+              const userInfo = await getUserInfo();
+              const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
+              if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
+                saveMembership({
+                  email: userInfo.email,
+                  membershipEnd: new Date(serverPlanEnd).toISOString(),
+                });
+                console.log('[TabLayout] Foreground: membership restored from server');
+              } else {
+                router.replace('/no-membership');
+                return;
+              }
+            } catch {
+              router.replace('/no-membership');
+              return;
+            }
           }
           // 1️⃣ Check permission
           const { status } = await Notifications.getPermissionsAsync();

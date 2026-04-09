@@ -16,6 +16,7 @@ import { GlobalLoadingOverlay } from '@/components/global-loading-overlay';
 import { Toast } from '@/components/ui/Toast';
 import { getUserInfo, updatePushToken } from '@/features/users';
 import { hydrateAuth, useAuth } from '@/lib/auth';
+import { getMembership, isMembershipValid, saveMembership } from '@/lib/membership';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 
@@ -112,6 +113,21 @@ function RootNavigator() {
         console.log('[RootLayout] checkUserInfo: onboarding marked complete');
       } else {
         console.log('[RootLayout] checkUserInfo: onboarding NOT completed yet');
+      }
+
+      // Restore membership from server if local cache is missing or expired
+      const localMembership = getMembership();
+      const serverPlanEnd = data.current_plan_end || data.planExpiry;
+      console.log('[RootLayout] checkUserInfo: isPaid =', data.isPaid, '| serverPlanEnd =', serverPlanEnd, '| localMembership =', JSON.stringify(localMembership));
+      if (data.isPaid && serverPlanEnd && (!localMembership || !isMembershipValid(localMembership.membershipEnd))) {
+        const serverExpiry = new Date(serverPlanEnd);
+        if (serverExpiry > new Date()) {
+          saveMembership({
+            email: data.email,
+            membershipEnd: serverExpiry.toISOString(),
+          });
+          console.log('[RootLayout] checkUserInfo: Membership restored from server, expires', serverExpiry.toISOString());
+        }
       }
     } catch (e: any) {
       console.error('[RootLayout] checkUserInfo: Failed to get user info:', e?.message || e);
