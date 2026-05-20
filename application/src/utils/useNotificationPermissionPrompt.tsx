@@ -1,10 +1,9 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { AppState } from 'react-native';
-
 
 import { updatePushToken } from '@/features/users';
 import { storage } from '@/lib/storage';
@@ -17,13 +16,12 @@ const LAST_PROMPT_TIME_KEY = 'last_notification_prompt_time';
 const PUSH_REGISTERED_KEY = 'push_token_registered';
 const LAST_FOREGROUND_PROMPT_KEY = 'last_foreground_prompt_time';
 
-
 export function useNotificationPermissionPrompt() {
   const [modalVisible, setModalVisible] = useState(false);
   const [enabled, setEnabled] = useState(false);
 
   const hasRegistered = useRef(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearPromptInterval = () => {
     if (intervalRef.current) {

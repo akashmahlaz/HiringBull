@@ -1,3 +1,4 @@
+import React from 'react';
 import { Image, Linking, StyleSheet, Text } from 'react-native';
 
 interface ParsedContentProps {

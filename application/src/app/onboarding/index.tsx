@@ -13,8 +13,11 @@ import { checkUserVerification, UserRegistration } from '@/features/users';
 import useRegisterOrEditUser from '@/features/users/hooks/useRegisterOrEditUser';
 import { useOnboarding, showGlobalLoading, hideGlobalLoading } from '@/lib';
 import NoActiveMembership from '../no-membership';
-import { getMembership, isMembershipValid, saveMembership } from '@/lib/membership';
-
+import {
+  getMembership,
+  isMembershipValid,
+  saveMembership,
+} from '@/lib/membership';
 
 type StepIndicatorProps = {
   currentStep: number;
@@ -25,7 +28,7 @@ function StepIndicator({ currentStep, totalSteps }: StepIndicatorProps) {
   return (
     <View className="mb-4 w-full flex-row items-center">
       {[1, 2, 3].map((step, index) => {
-         const isActive = currentStep >= step;
+        const isActive = currentStep >= step;
         return (
           <React.Fragment key={step}>
             <View
@@ -45,8 +48,6 @@ function StepIndicator({ currentStep, totalSteps }: StepIndicatorProps) {
     </View>
   );
 }
-
-
 
 export default function Onboarding() {
   const router = useRouter();
@@ -83,14 +84,22 @@ export default function Onboarding() {
       try {
         console.log('[Onboarding] Calling checkUserVerification for:', email);
         const verificationData = await checkUserVerification(email);
-        console.log('[Onboarding] Verification response:', JSON.stringify(verificationData));
+        console.log(
+          '[Onboarding] Verification response:',
+          JSON.stringify(verificationData)
+        );
         saveMembership({
           email,
-          membershipEnd: verificationData.data.membershipEnd,
+          membershipEnd: verificationData.membershipEnd,
         });
 
-        const isValid = isMembershipValid(verificationData.data.membershipEnd);
-        console.log('[Onboarding] Membership valid =', isValid, '| membershipEnd =', verificationData.data.membershipEnd);
+        const isValid = isMembershipValid(verificationData.membershipEnd);
+        console.log(
+          '[Onboarding] Membership valid =',
+          isValid,
+          '| membershipEnd =',
+          verificationData.membershipEnd
+        );
         if (!isValid) {
           setIsVerifiedUser(false);
         } else {
@@ -98,7 +107,10 @@ export default function Onboarding() {
         }
       } catch (err: any) {
         // 404 = no membership record exists → user has no membership
-        console.log('[Onboarding] Membership check failed:', err?.response?.status || err.message);
+        console.log(
+          '[Onboarding] Membership check failed:',
+          err?.response?.status || err.message
+        );
         setIsVerifiedUser(false);
       } finally {
         setMembershipLoading(false);
@@ -197,17 +209,23 @@ export default function Onboarding() {
     console.log('[Onboarding] Still checking membership, showing loading...');
     return (
       <View className="flex-1 items-center justify-center bg-white">
-        <Text className="text-base text-neutral-500">Checking membership...</Text>
+        <Text className="text-base text-neutral-500">
+          Checking membership...
+        </Text>
       </View>
     );
   }
 
   console.log('[Onboarding] isVerifiedUser =', isVerifiedUser);
   if (!isVerifiedUser) {
-    console.log('[Onboarding] User has no valid membership → showing NoActiveMembership');
+    console.log(
+      '[Onboarding] User has no valid membership → showing NoActiveMembership'
+    );
     return <NoActiveMembership />;
   }
-  console.log('[Onboarding] User has valid membership → showing onboarding steps');
+  console.log(
+    '[Onboarding] User has valid membership → showing onboarding steps'
+  );
 
   return (
     <View className="flex-1 bg-white dark:bg-neutral-900">
@@ -216,7 +234,8 @@ export default function Onboarding() {
         {!isVerifiedUser && (
           <Pressable className="p-0" onPress={openInviteEmail}>
             <Text className="text-center text-xl mb-4 leading-5 bg-primary-200 py-3 px-2">
-              You have not received the invite.Kindly click here to get invite{' '}
+              You have not received the invite.Kindly click here to get
+              invite{' '}
             </Text>
           </Pressable>
         )}

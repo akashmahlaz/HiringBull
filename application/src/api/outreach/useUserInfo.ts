@@ -5,6 +5,7 @@ import { client } from '../common';
 type UserDevice = {
   id: string;
   userId: string;
+  deviceId?: string;
   type: 'android' | 'ios' | 'web';
   token: string;
   createdAt: string;
@@ -20,7 +21,7 @@ type FollowedCompany = {
   updatedAt: string;
 };
 
-type UserMeResponse = {
+export type UserMeResponse = {
   active: boolean;
   email: string;
   clerkId: string;
@@ -43,6 +44,8 @@ type UserMeResponse = {
   devices: UserDevice[];
   followedCompanies: FollowedCompany[];
   planExpiry: string | null;
+  name?: string;
+  tokens_left?: number;
 };
 
 export const useMyProfile = createQuery<UserMeResponse, void, AxiosError>({

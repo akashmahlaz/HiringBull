@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
@@ -9,7 +9,11 @@ import { AppState, Platform, View } from 'react-native';
 
 import { getUserInfo, updatePushToken } from '@/features/users';
 import { useSingleDeviceSessionGuard } from '@/lib/hooks/useSingleDeviceSessionGuard';
-import { getMembership, isMembershipValid, saveMembership } from '@/lib/membership';
+import {
+  getMembership,
+  isMembershipValid,
+  saveMembership,
+} from '@/lib/membership';
 import getOrCreateDeviceId from '@/utils/getOrCreatedId';
 
 import DeviceConflict from './outreach/deviceConflict';
@@ -23,27 +27,45 @@ export default function TabLayout() {
   useEffect(() => {
     const checkMembership = async () => {
       let membershipData = getMembership();
-      console.log('[TabLayout] Mount: membershipData =', JSON.stringify(membershipData));
+      console.log(
+        '[TabLayout] Mount: membershipData =',
+        JSON.stringify(membershipData)
+      );
 
       // If local membership is missing or expired, try restoring from server
       if (!membershipData || !isMembershipValid(membershipData.membershipEnd)) {
-        console.log('[TabLayout] Local membership missing/expired, checking server...');
+        console.log(
+          '[TabLayout] Local membership missing/expired, checking server...'
+        );
         try {
           const userInfo = await getUserInfo();
-          const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
-          if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
+          const serverPlanEnd =
+            userInfo.current_plan_end || userInfo.planExpiry;
+          if (
+            userInfo.isPaid &&
+            serverPlanEnd &&
+            new Date(serverPlanEnd) > new Date()
+          ) {
             saveMembership({
               email: userInfo.email,
               membershipEnd: new Date(serverPlanEnd).toISOString(),
             });
-            console.log('[TabLayout] Membership restored from server, expires', serverPlanEnd);
+            console.log(
+              '[TabLayout] Membership restored from server, expires',
+              serverPlanEnd
+            );
             return; // Stay in (app)
           }
         } catch (e: any) {
-          console.warn('[TabLayout] Failed to check server membership:', e.message);
+          console.warn(
+            '[TabLayout] Failed to check server membership:',
+            e.message
+          );
         }
 
-        console.log('[TabLayout] No valid membership → redirecting to /no-membership');
+        console.log(
+          '[TabLayout] No valid membership → redirecting to /no-membership'
+        );
         router.replace('/no-membership');
         return;
       }
@@ -70,13 +92,20 @@ export default function TabLayout() {
             // Try server before kicking out
             try {
               const userInfo = await getUserInfo();
-              const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
-              if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
+              const serverPlanEnd =
+                userInfo.current_plan_end || userInfo.planExpiry;
+              if (
+                userInfo.isPaid &&
+                serverPlanEnd &&
+                new Date(serverPlanEnd) > new Date()
+              ) {
                 saveMembership({
                   email: userInfo.email,
                   membershipEnd: new Date(serverPlanEnd).toISOString(),
                 });
-                console.log('[TabLayout] Foreground: membership restored from server');
+                console.log(
+                  '[TabLayout] Foreground: membership restored from server'
+                );
               } else {
                 router.replace('/no-membership');
                 return;
@@ -131,20 +160,28 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
-        tabBarActiveTintColor: '#0a0a0a', // neutral-950 (black)
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: '#4f46e5', // indigo-600
         tabBarInactiveTintColor: '#a3a3a3', // neutral-400 (gray)
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
+        },
         tabBarStyle: {
           backgroundColor: isDark ? '#000000' : '#ffffff',
           borderTopColor: isDark ? '#333333' : '#f5f5f5',
           borderTopWidth: 1,
-          paddingTop: 10,
+          paddingTop: 8,
+          paddingBottom: 8,
+          height: 64,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
+          tabBarLabel: 'Jobs',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'briefcase' : 'briefcase-outline'}
@@ -157,6 +194,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="outreach"
         options={{
+          tabBarLabel: 'Referrals',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'paper-plane' : 'paper-plane-outline'}
@@ -167,30 +205,22 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="socialPosts"
+        name="resources"
         options={{
-          tabBarIcon: ({ color }) => (
-            <View
-              style={{
-                width: 24,
-                height: 24,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <MaterialCommunityIcons
-                name="format-quote-close"
-                size={24}
-                color={color}
-                style={{ transform: [{ scale: 1.65 }], marginTop: -1 }}
-              />
-            </View>
+          tabBarLabel: 'Resources',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'globe' : 'globe-outline'}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
+          tabBarLabel: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}

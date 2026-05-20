@@ -1,3 +1,4 @@
+import type { UserMeResponse } from '@/api/outreach/useUserInfo';
 import { useAuth } from '@/lib/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { type BottomSheetModal } from '@gorhom/bottom-sheet';
@@ -16,7 +17,11 @@ import {
 import { AppConfirmModal } from '@/components/ui/AppConfirmModal';
 import { resetOnboarding } from '@/lib';
 import { resetUser } from '@/features/users';
-import { clearMembership, getMembership, isMembershipValid } from '@/lib/membership';
+import {
+  clearMembership,
+  getMembership,
+  isMembershipValid,
+} from '@/lib/membership';
 
 type SettingsItem = {
   label: string;
@@ -66,7 +71,7 @@ export default function Profile() {
   // Get user info from backend API (saved in Zustand store)
   const queryClient = useQueryClient();
 
-  const userInfo = queryClient.getQueryData(['users', 'me']);
+  const userInfo = queryClient.getQueryData<UserMeResponse>(['users', 'me']);
   // const userInfo = useOnboarding.use.userInfo();
 
   const handleLogout = () => {
@@ -139,7 +144,9 @@ export default function Profile() {
     }
   };
   const membershipData = getMembership();
-  const isValid = isMembershipValid(membershipData?.membershipEnd);
+  const isValid = membershipData
+    ? isMembershipValid(membershipData.membershipEnd)
+    : false;
 
   return (
     <>
@@ -230,14 +237,15 @@ export default function Profile() {
                       isValid ? 'text-neutral-600' : 'text-danger-600'
                     }`}
                   >
-                    {new Date(membershipData?.membershipEnd).toLocaleDateString(
-                      'en-IN',
-                      {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                      }
-                    )}
+                    {membershipData
+                      ? new Date(
+                          membershipData.membershipEnd
+                        ).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric',
+                        })
+                      : 'N/A'}
                   </Text>
                 </View>
               </View>

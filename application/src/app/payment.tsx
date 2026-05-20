@@ -1,8 +1,18 @@
 import { useAuth, getUserEmail } from '@/lib/auth';
-import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  FontAwesome6,
+  Ionicons,
+  MaterialCommunityIcons,
+} from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Alert, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
 import {
   initConnection,
   endConnection,
@@ -20,7 +30,11 @@ import {
 
 import { SafeAreaView, Text, View } from '@/components/ui';
 import { client } from '@/api/common/client';
-import { getMembership, isMembershipValid, saveMembership } from '@/lib/membership';
+import {
+  getMembership,
+  isMembershipValid,
+  saveMembership,
+} from '@/lib/membership';
 import { getUserInfo } from '@/features/users';
 
 const TAG = '[Payment]';
@@ -115,15 +129,19 @@ export default function PaymentScreen() {
   // guards decide the correct screen, same as login.tsx does.
   useEffect(() => {
     if (shouldNavigate) {
-      console.log(`${TAG} Navigating to / via state trigger (guards will resolve to (app))`);
+      console.log(
+        `${TAG} Navigating to / via state trigger (guards will resolve to (app))`
+      );
       router.replace('/');
     }
   }, [shouldNavigate, router]);
 
   // ─── Initialize IAP connection ────────────────────────────
   useEffect(() => {
-    let purchaseUpdateSub: ReturnType<typeof purchaseUpdatedListener> | null = null;
-    let purchaseErrorSub: ReturnType<typeof purchaseErrorListener> | null = null;
+    let purchaseUpdateSub: ReturnType<typeof purchaseUpdatedListener> | null =
+      null;
+    let purchaseErrorSub: ReturnType<typeof purchaseErrorListener> | null =
+      null;
 
     const init = async () => {
       try {
@@ -133,25 +151,40 @@ export default function PaymentScreen() {
         setConnectionReady(true);
 
         // Fetch products from Google Play (in-app type only)
-        console.log(`${TAG} Fetching products with SKUs:`, JSON.stringify(productIds));
+        console.log(
+          `${TAG} Fetching products with SKUs:`,
+          JSON.stringify(productIds)
+        );
         const items = await fetchProducts({ skus: productIds, type: 'in-app' });
         console.log(`${TAG} Products fetched count:`, items?.length ?? 0);
-        console.log(`${TAG} Products fetched details:`, JSON.stringify(items, null, 2));
+        console.log(
+          `${TAG} Products fetched details:`,
+          JSON.stringify(items, null, 2)
+        );
         if (!items || items.length === 0) {
-          console.warn(`${TAG} WARNING: No products returned from Google Play! SKUs may not exist in Play Console.`);
+          console.warn(
+            `${TAG} WARNING: No products returned from Google Play! SKUs may not exist in Play Console.`
+          );
           console.warn(`${TAG} Requested SKUs: ${productIds.join(', ')}`);
         } else {
           items.forEach((item: any) => {
-            console.log(`${TAG} Product: id=${item.productId}, title=${item.title}, price=${item.localizedPrice}`);
+            console.log(
+              `${TAG} Product: id=${item.productId}, title=${item.title}, price=${item.localizedPrice}`
+            );
           });
         }
         setProducts((items as Product[]) ?? []);
       } catch (err: any) {
-        console.error(`${TAG} IAP init error:`, err.message, err.code, JSON.stringify(err));
+        console.error(
+          `${TAG} IAP init error:`,
+          err.message,
+          err.code,
+          JSON.stringify(err)
+        );
         // In dev/emulator, IAP may not be available
         Alert.alert(
           'Store Unavailable',
-          'Could not connect to Google Play. Make sure you are using a real device with Google Play services.',
+          'Could not connect to Google Play. Make sure you are using a real device with Google Play services.'
         );
       } finally {
         setLoading(false);
@@ -183,7 +216,10 @@ export default function PaymentScreen() {
         const response = await client.post('/api/payment/google-play/verify', {
           purchaseToken: purchase.purchaseToken,
           productId: purchase.productId,
-          packageName: ('packageNameAndroid' in purchase ? purchase.packageNameAndroid : null) || 'com.hiringbull',
+          packageName:
+            ('packageNameAndroid' in purchase
+              ? purchase.packageNameAndroid
+              : null) || 'com.hiringbull',
         });
 
         if (response.data.success) {
@@ -197,20 +233,27 @@ export default function PaymentScreen() {
             hb_pro_6mo: 180,
           };
           const days = daysMap[purchase.productId] || 30;
-          const membershipEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+          const membershipEnd = new Date(
+            Date.now() + days * 24 * 60 * 60 * 1000
+          );
 
           saveMembership({
             email: email || '',
             membershipEnd: membershipEnd.toISOString(),
           });
-          console.log(`${TAG} Membership saved, membershipEnd=${membershipEnd.toISOString()}`);
+          console.log(
+            `${TAG} Membership saved, membershipEnd=${membershipEnd.toISOString()}`
+          );
 
           // Finish/acknowledge the transaction on client side
           try {
             await finishTransaction({ purchase, isConsumable: true });
             console.log(`${TAG} Transaction finished`);
           } catch (finishErr: any) {
-            console.warn(`${TAG} finishTransaction warning:`, finishErr.message);
+            console.warn(
+              `${TAG} finishTransaction warning:`,
+              finishErr.message
+            );
           }
 
           // Navigate immediately — don't wait for Alert interaction
@@ -223,14 +266,19 @@ export default function PaymentScreen() {
       } catch (err: any) {
         console.error(`${TAG} Verify error:`, err.message);
         purchaseProcessed.current = false; // Allow retry
-        Alert.alert('Verification Failed', 'Payment was received but verification failed. Please contact support.');
+        Alert.alert(
+          'Verification Failed',
+          'Payment was received but verification failed. Please contact support.'
+        );
         setPurchasing(false);
       }
     });
 
     // Listen for purchase errors
     purchaseErrorSub = purchaseErrorListener((error: PurchaseError) => {
-      console.error(`${TAG} Purchase error: code=${error.code}, message=${error.message}, debugMessage=${error.debugMessage}, responseCode=${error.responseCode}`);
+      console.error(
+        `${TAG} Purchase error: code=${error.code}, message=${error.message}, debugMessage=${(error as any).debugMessage}, responseCode=${(error as any).responseCode}`
+      );
       console.error(`${TAG} Full purchase error:`, JSON.stringify(error));
       setPurchasing(false);
 
@@ -239,7 +287,10 @@ export default function PaymentScreen() {
         return;
       }
 
-      Alert.alert('Purchase Failed', `${error.message || 'Something went wrong.'}\n\nCode: ${error.code}\nSKU: ${error.productId || 'unknown'}`);
+      Alert.alert(
+        'Purchase Failed',
+        `${error.message || 'Something went wrong.'}\n\nCode: ${error.code}\nSKU: ${error.productId || 'unknown'}`
+      );
     });
 
     return () => {
@@ -261,7 +312,10 @@ export default function PaymentScreen() {
       console.log(`${TAG} Restore: found ${owned.length} owned purchases`);
 
       if (owned.length === 0) {
-        Alert.alert('No Purchases Found', 'No previous purchases were found on this account.');
+        Alert.alert(
+          'No Purchases Found',
+          'No previous purchases were found on this account.'
+        );
         setRestoring(false);
         return;
       }
@@ -269,16 +323,26 @@ export default function PaymentScreen() {
       // Try to verify each owned purchase with the server
       let verified = false;
       for (const purchase of owned) {
-        console.log(`${TAG} Restore: trying to verify ${purchase.productId}, token length=${purchase.purchaseToken?.length}`);
+        console.log(
+          `${TAG} Restore: trying to verify ${purchase.productId}, token length=${purchase.purchaseToken?.length}`
+        );
         try {
-          const response = await client.post('/api/payment/google-play/verify', {
-            purchaseToken: purchase.purchaseToken,
-            productId: purchase.productId,
-            packageName: ('packageNameAndroid' in purchase ? purchase.packageNameAndroid : null) || 'com.hiringbull',
-          });
+          const response = await client.post(
+            '/api/payment/google-play/verify',
+            {
+              purchaseToken: purchase.purchaseToken,
+              productId: purchase.productId,
+              packageName:
+                ('packageNameAndroid' in purchase
+                  ? purchase.packageNameAndroid
+                  : null) || 'com.hiringbull',
+            }
+          );
 
           if (response.data.success) {
-            console.log(`${TAG} Restore: server verified ${purchase.productId}`);
+            console.log(
+              `${TAG} Restore: server verified ${purchase.productId}`
+            );
             const plan = PLANS.find((p) => p.id === purchase.productId);
             const daysMap: Record<string, number> = {
               hb_starter_1mo: 30,
@@ -286,7 +350,9 @@ export default function PaymentScreen() {
               hb_pro_6mo: 180,
             };
             const days = daysMap[purchase.productId] || 30;
-            const membershipEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+            const membershipEnd = new Date(
+              Date.now() + days * 24 * 60 * 60 * 1000
+            );
             const email = getUserEmail();
             saveMembership({
               email: email || '',
@@ -297,12 +363,15 @@ export default function PaymentScreen() {
             Alert.alert(
               'Purchase Restored! 🎉',
               `Your ${plan?.name || ''} plan is now active.`,
-              [{ text: 'Continue', onPress: () => setShouldNavigate(true) }],
+              [{ text: 'Continue', onPress: () => setShouldNavigate(true) }]
             );
             break;
           }
         } catch (verifyErr: any) {
-          console.error(`${TAG} Restore: verify failed for ${purchase.productId}:`, verifyErr?.response?.data || verifyErr.message);
+          console.error(
+            `${TAG} Restore: verify failed for ${purchase.productId}:`,
+            verifyErr?.response?.data || verifyErr.message
+          );
         }
       }
 
@@ -319,17 +388,24 @@ export default function PaymentScreen() {
               onPress: async () => {
                 for (const purchase of owned) {
                   try {
-                    console.log(`${TAG} Restore: consuming ${purchase.productId}`);
+                    console.log(
+                      `${TAG} Restore: consuming ${purchase.productId}`
+                    );
                     await finishTransaction({ purchase, isConsumable: true });
-                    console.log(`${TAG} Restore: consumed ${purchase.productId}`);
+                    console.log(
+                      `${TAG} Restore: consumed ${purchase.productId}`
+                    );
                   } catch (e: any) {
                     console.error(`${TAG} Restore: consume failed:`, e.message);
                   }
                 }
-                Alert.alert('Cleared', 'Previous purchases cleared. You can now purchase again.');
+                Alert.alert(
+                  'Cleared',
+                  'Previous purchases cleared. You can now purchase again.'
+                );
               },
             },
-          ],
+          ]
         );
       }
     } catch (err: any) {
@@ -348,7 +424,10 @@ export default function PaymentScreen() {
     if (!plan) return;
 
     console.log(`${TAG} Starting purchase for: ${plan.id}`);
-    console.log(`${TAG} Available products:`, products.map((p: any) => p.productId));
+    console.log(
+      `${TAG} Available products:`,
+      products.map((p: any) => p.productId)
+    );
     console.log(`${TAG} Connection ready: ${connectionReady}`);
     purchaseProcessed.current = false;
     setPurchasing(true);
@@ -366,12 +445,21 @@ export default function PaymentScreen() {
       // Fallback: if purchaseUpdatedListener doesn't fire within 30s, check server
       purchaseTimeoutRef.current = setTimeout(async () => {
         if (purchaseProcessed.current) return; // Already handled by listener
-        console.log(`${TAG} Listener timeout — checking server for membership...`);
+        console.log(
+          `${TAG} Listener timeout — checking server for membership...`
+        );
         try {
           const userInfo = await getUserInfo();
-          const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
-          if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
-            console.log(`${TAG} Server confirms payment! Saving membership and navigating.`);
+          const serverPlanEnd =
+            userInfo.current_plan_end || userInfo.planExpiry;
+          if (
+            userInfo.isPaid &&
+            serverPlanEnd &&
+            new Date(serverPlanEnd) > new Date()
+          ) {
+            console.log(
+              `${TAG} Server confirms payment! Saving membership and navigating.`
+            );
             purchaseProcessed.current = true;
             saveMembership({
               email: userInfo.email,
@@ -381,7 +469,9 @@ export default function PaymentScreen() {
             setPurchasedPlanId(plan.id);
             setShouldNavigate(true);
           } else {
-            console.log(`${TAG} Server shows no active membership yet, keeping user on payment screen.`);
+            console.log(
+              `${TAG} Server shows no active membership yet, keeping user on payment screen.`
+            );
             setPurchasing(false);
           }
         } catch (e: any) {
@@ -390,16 +480,30 @@ export default function PaymentScreen() {
         }
       }, 30000);
     } catch (err: any) {
-      console.error(`${TAG} requestPurchase error:`, err.message, err.code, JSON.stringify(err));
+      console.error(
+        `${TAG} requestPurchase error:`,
+        err.message,
+        err.code,
+        JSON.stringify(err)
+      );
 
       if (err.code === 'E_ALREADY_OWNED') {
         // Product already owned but not consumed — check server and try to consume
-        console.log(`${TAG} E_ALREADY_OWNED — checking server for existing membership...`);
+        console.log(
+          `${TAG} E_ALREADY_OWNED — checking server for existing membership...`
+        );
         try {
           const userInfo = await getUserInfo();
-          const serverPlanEnd = userInfo.current_plan_end || userInfo.planExpiry;
-          if (userInfo.isPaid && serverPlanEnd && new Date(serverPlanEnd) > new Date()) {
-            console.log(`${TAG} Server confirms active membership. Consuming old purchase and navigating.`);
+          const serverPlanEnd =
+            userInfo.current_plan_end || userInfo.planExpiry;
+          if (
+            userInfo.isPaid &&
+            serverPlanEnd &&
+            new Date(serverPlanEnd) > new Date()
+          ) {
+            console.log(
+              `${TAG} Server confirms active membership. Consuming old purchase and navigating.`
+            );
             purchaseProcessed.current = true;
             saveMembership({
               email: userInfo.email,
@@ -413,7 +517,10 @@ export default function PaymentScreen() {
                 console.log(`${TAG} Consumed old purchase: ${p.productId}`);
               }
             } catch (consumeErr: any) {
-              console.warn(`${TAG} Could not consume old purchase:`, consumeErr.message);
+              console.warn(
+                `${TAG} Could not consume old purchase:`,
+                consumeErr.message
+              );
             }
             setPurchasing(false);
             setPurchasedPlanId(plan.id);
@@ -432,11 +539,17 @@ export default function PaymentScreen() {
             console.log(`${TAG} Consumed: ${p.productId}`);
           }
           setPurchasing(false);
-          Alert.alert('Previous Purchase Cleared', 'A previous unfinished purchase was found and cleared. Please try again.');
+          Alert.alert(
+            'Previous Purchase Cleared',
+            'A previous unfinished purchase was found and cleared. Please try again.'
+          );
         } catch (consumeErr: any) {
           console.warn(`${TAG} Failed to consume:`, consumeErr.message);
           setPurchasing(false);
-          Alert.alert('Purchase Issue', 'A previous purchase is blocking. Please contact support.');
+          Alert.alert(
+            'Purchase Issue',
+            'A previous purchase is blocking. Please contact support.'
+          );
         }
         return;
       }
@@ -444,7 +557,10 @@ export default function PaymentScreen() {
       setPurchasing(false);
 
       if (err.code !== ErrorCode.UserCancelled) {
-        Alert.alert('Purchase Error', 'Could not initiate purchase. Please try again.');
+        Alert.alert(
+          'Purchase Error',
+          'Could not initiate purchase. Please try again.'
+        );
       }
     }
   }, [selectedPlan, purchasing]);
@@ -455,7 +571,11 @@ export default function PaymentScreen() {
       {/* Header */}
       <View className="flex-row items-center gap-3 px-5 pt-4 pb-2">
         <Pressable
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/no-membership')}
+          onPress={() =>
+            router.canGoBack()
+              ? router.back()
+              : router.replace('/no-membership')
+          }
           className="size-10 items-center justify-center rounded-full bg-neutral-100"
         >
           <Ionicons name="arrow-back" size={20} color="#262626" />
@@ -466,12 +586,18 @@ export default function PaymentScreen() {
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#f59e0b" />
-          <Text className="mt-4 text-base text-neutral-500">Loading plans...</Text>
+          <Text className="mt-4 text-base text-neutral-500">
+            Loading plans...
+          </Text>
         </View>
       ) : (
         <>
           <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 }}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: 24,
+            }}
             showsVerticalScrollIndicator={false}
           >
             {/* Subtitle */}
@@ -484,27 +610,34 @@ export default function PaymentScreen() {
               const isSelected = selectedPlan === plan.id;
               // Use Google Play price if available, otherwise fallback
               const googleProduct = products.find((p) => p.id === plan.id);
-              const displayPrice = googleProduct?.displayPrice || plan.totalPrice;
+              const displayPrice =
+                googleProduct?.displayPrice || plan.totalPrice;
 
               return (
                 <Pressable
                   key={plan.id}
                   onPress={() => setSelectedPlan(plan.id)}
                   className={`mb-4 rounded-2xl border-2 p-5 ${
-                    isSelected ? 'border-black bg-neutral-50' : 'border-neutral-200 bg-white'
+                    isSelected
+                      ? 'border-black bg-neutral-50'
+                      : 'border-neutral-200 bg-white'
                   }`}
                 >
                   {/* Popular badge */}
                   {plan.popular && !purchasedPlanId && (
                     <View className="absolute -top-3 right-4 rounded-full bg-blue-500 px-3 py-1">
-                      <Text className="text-xs font-bold text-white">MOST POPULAR</Text>
+                      <Text className="text-xs font-bold text-white">
+                        MOST POPULAR
+                      </Text>
                     </View>
                   )}
 
                   {/* Purchased badge */}
                   {purchasedPlanId === plan.id && (
                     <View className="absolute -top-3 right-4 rounded-full bg-green-500 px-3 py-1">
-                      <Text className="text-xs font-bold text-white">✓ PURCHASED</Text>
+                      <Text className="text-xs font-bold text-white">
+                        ✓ PURCHASED
+                      </Text>
                     </View>
                   )}
 
@@ -516,18 +649,33 @@ export default function PaymentScreen() {
                         style={{ backgroundColor: plan.color + '20' }}
                       >
                         {plan.icon === 'crown' ? (
-                          <FontAwesome6 name="crown" size={20} color={plan.color} />
+                          <FontAwesome6
+                            name="crown"
+                            size={20}
+                            color={plan.color}
+                          />
                         ) : plan.icon === 'trending-up' ? (
-                          <MaterialCommunityIcons name="trending-up" size={22} color={plan.color} />
+                          <MaterialCommunityIcons
+                            name="trending-up"
+                            size={22}
+                            color={plan.color}
+                          />
                         ) : (
-                          <MaterialCommunityIcons name="rocket-launch" size={20} color={plan.color} />
+                          <MaterialCommunityIcons
+                            name="rocket-launch"
+                            size={20}
+                            color={plan.color}
+                          />
                         )}
                       </View>
                       <View className="flex-1">
                         <Text className="text-lg font-bold">
-                          {plan.name}{plan.durationMonths > 1 ? ` - ${plan.duration}` : ''}
+                          {plan.name}
+                          {plan.durationMonths > 1 ? ` - ${plan.duration}` : ''}
                         </Text>
-                        <Text className="text-xs text-neutral-400">{plan.subtitle}</Text>
+                        <Text className="text-xs text-neutral-400">
+                          {plan.subtitle}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -535,7 +683,10 @@ export default function PaymentScreen() {
                   {/* Price row */}
                   <View className="mt-3">
                     <View className="flex-row items-baseline gap-1">
-                      <Text className="text-2xl font-bold" style={{ color: plan.color }}>
+                      <Text
+                        className="text-2xl font-bold"
+                        style={{ color: plan.color }}
+                      >
                         {plan.pricePerMonth}
                       </Text>
                       <Text className="text-sm text-neutral-400">/ month</Text>
@@ -551,9 +702,18 @@ export default function PaymentScreen() {
                   {isSelected && (
                     <View className="mt-4 border-t border-neutral-100 pt-4">
                       {plan.features.map((feature, idx) => (
-                        <View key={idx} className="mb-2 flex-row items-center gap-2">
-                          <Ionicons name="checkmark-circle" size={18} color={plan.color} />
-                          <Text className="text-sm text-neutral-700">{feature}</Text>
+                        <View
+                          key={idx}
+                          className="mb-2 flex-row items-center gap-2"
+                        >
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={18}
+                            color={plan.color}
+                          />
+                          <Text className="text-sm text-neutral-700">
+                            {feature}
+                          </Text>
                         </View>
                       ))}
                     </View>
@@ -563,10 +723,14 @@ export default function PaymentScreen() {
                   <View className="absolute right-5 top-6">
                     <View
                       className={`size-6 items-center justify-center rounded-full border-2 ${
-                        isSelected ? 'border-black bg-black' : 'border-neutral-300'
+                        isSelected
+                          ? 'border-black bg-black'
+                          : 'border-neutral-300'
                       }`}
                     >
-                      {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={14} color="white" />
+                      )}
                     </View>
                   </View>
                 </Pressable>
@@ -606,7 +770,9 @@ export default function PaymentScreen() {
               {purchasing ? (
                 <View className="flex-row items-center justify-center gap-2">
                   <ActivityIndicator size="small" color="white" />
-                  <Text className="text-base font-bold text-white">Processing...</Text>
+                  <Text className="text-base font-bold text-white">
+                    Processing...
+                  </Text>
                 </View>
               ) : purchasedPlanId ? (
                 <View className="flex-row items-center justify-center gap-2">
@@ -617,13 +783,18 @@ export default function PaymentScreen() {
                 </View>
               ) : (
                 <Text className="text-center text-base font-bold text-white">
-                  Subscribe — {PLANS.find((p) => p.id === selectedPlan)?.totalPrice}
+                  Subscribe —{' '}
+                  {PLANS.find((p) => p.id === selectedPlan)?.totalPrice}
                 </Text>
               )}
             </Pressable>
 
             <Pressable
-              onPress={() => router.canGoBack() ? router.back() : router.replace('/no-membership')}
+              onPress={() =>
+                router.canGoBack()
+                  ? router.back()
+                  : router.replace('/no-membership')
+              }
               className="mt-3"
             >
               <Text className="text-center text-sm text-neutral-500">

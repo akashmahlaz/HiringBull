@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, Animated, Image } from 'react-native';
-import {useEffect} from 'react';
+import React, { useEffect } from 'react';
 import { Images } from 'assets';
 
 const LogoLoader = () => {
@@ -49,13 +49,13 @@ const LogoLoader = () => {
             },
           ]}
         >
-          <Image source={Images.appLogo} className='w-full h-full'/>
+          <Image source={Images.appLogo} className="w-full h-full" />
         </Animated.View>
       </View>
     </View>
   );
-}
-export default LogoLoader
+};
+export default LogoLoader;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
