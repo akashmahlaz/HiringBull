@@ -96,8 +96,8 @@ const _clientEnv = {
   APP_ENV,
   NAME: NAME,
   SCHEME: SCHEME,
-  BUNDLE_ID: withEnvSuffix(BUNDLE_ID),
-  PACKAGE: withEnvSuffix(PACKAGE),
+  BUNDLE_ID: BUNDLE_ID,
+  PACKAGE: PACKAGE,
   VERSION: packageJSON.version,
   // EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
 
