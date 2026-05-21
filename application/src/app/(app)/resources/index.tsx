@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, TextInput } from 'react-native';
 import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
@@ -8,6 +9,7 @@ import { FocusAwareStatusBar, SafeAreaView, Text, View } from '@/components/ui';
 // ─── Types ───────────────────────────────────────────────────────────────────
 type ResourceItem = {
   id: string;
+  route: string;
   title: string;
   description: string;
   Icon: React.ComponentType<object>;
@@ -20,7 +22,6 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   );
 }
 
-// ─── Icon colors (from screenshot) ───────────────────────────────────────────
 const C = {
   green: '#2ec27e',
   purple: '#7c3aed',
@@ -131,36 +132,42 @@ function OnlineResourcesIcon() {
 const RESOURCES: ResourceItem[] = [
   {
     id: 'compensation',
+    route: '/resources/compensation',
     title: 'Compensation Insights',
     description: 'Explore salary ranges, perks & company benefits',
     Icon: CompensationIcon,
   },
   {
     id: 'interview-experiences',
+    route: '/resources/interview-experiences',
     title: 'Interview Experiences',
     description: 'Real interview experiences shared by candidates',
     Icon: InterviewExperiencesIcon,
   },
   {
     id: 'ai-coach',
+    route: '/resources/ai-coach',
     title: 'AI Interview Coach',
     description: 'Get AI-powered feedback to improve',
     Icon: AICoachIcon,
   },
   {
     id: 'questions',
+    route: '/resources/questions',
     title: 'Questions to Solve',
     description: 'Practice technical & aptitude questions',
     Icon: QuestionsToSolveIcon,
   },
   {
     id: 'mock-interviews',
+    route: '/resources/mock-interviews',
     title: 'Mock Interviews',
     description: 'Practice with topmate profiles & experts',
     Icon: MockInterviewsIcon,
   },
   {
     id: 'online-resources',
+    route: '/resources/online-resources',
     title: 'Online Resources',
     description: 'Curated blogs, videos & study materials',
     Icon: OnlineResourcesIcon,
@@ -169,20 +176,20 @@ const RESOURCES: ResourceItem[] = [
 
 // ─── Resource Card ────────────────────────────────────────────────────────────
 function ResourceCard({ item }: { item: ResourceItem }) {
-  const { Icon, title, description } = item;
+  const router = useRouter();
+  const { Icon, title, description, route } = item;
 
   return (
     <Pressable
+      onPress={() => router.push(route as never)}
       className="h-[200px] flex-1 rounded-2xl border border-neutral-200 bg-white p-4 active:opacity-75"
       accessibilityRole="button"
       accessibilityLabel={title}
     >
-      {/* Icon — LEFT aligned */}
       <View className="mb-3 items-start">
         <Icon />
       </View>
 
-      {/* Title — bold */}
       <Text
         className="mb-1 text-[15px] font-bold leading-[20px] text-neutral-900"
         numberOfLines={2}
@@ -190,7 +197,6 @@ function ResourceCard({ item }: { item: ResourceItem }) {
         {title}
       </Text>
 
-      {/* Description */}
       <Text
         className="text-[12px] leading-[17px] text-neutral-500"
         numberOfLines={3}
@@ -198,7 +204,6 @@ function ResourceCard({ item }: { item: ResourceItem }) {
         {description}
       </Text>
 
-      {/* Chevron — pinned to bottom right */}
       <View className="mt-auto items-end">
         <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
       </View>
@@ -234,7 +239,6 @@ export default function Resources() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="px-5 pb-10">
-          {/* Header */}
           <View className="pb-1 pt-4">
             <Text className="mb-2 text-[36px] font-extrabold leading-[42px] text-neutral-900">
               Resources
@@ -244,7 +248,6 @@ export default function Resources() {
             </Text>
           </View>
 
-          {/* Search Bar */}
           <View className="my-6 h-14 flex-row items-center gap-3 rounded-2xl bg-neutral-100 px-4">
             <Ionicons name="search-outline" size={20} color="#9ca3af" />
             <TextInput
@@ -262,7 +265,6 @@ export default function Resources() {
             )}
           </View>
 
-          {/* Grid */}
           {filteredResources.length === 0 ? (
             <View className="mt-16 items-center justify-center">
               <Ionicons name="search-outline" size={48} color="#9ca3af" />

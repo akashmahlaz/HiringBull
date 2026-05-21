@@ -12,6 +12,7 @@ import authRoutes from './authRoutes.js';
 import freeJobsRoutes from './freeJobsRoutes.js'; 
 import applicationRoutes from './applicationRoutes.js'
 import membershipRoutes from './membershipRoutes.js'
+import resourceRoutes from './resourceRoutes.js'
 
 const router = express.Router();
 
@@ -33,5 +34,6 @@ router.use('/social-posts', socialPostRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/companies', companyRoutes);
 router.use('/web-registration', webRegistrationRoutes);
+router.use('/resources', resourceRoutes);
 
 export default router;
