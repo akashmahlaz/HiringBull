@@ -2,6 +2,9 @@ node_modules/
 .expo/
 dist/
 npm-debug.*
+
+# Local environment — copy .env.example to .env and fill in values
+.env
 *.jks
 *.p8
 *.p12
@@ -24,3 +27,5 @@ expo-env.d.ts
 # @end expo-cli
 /android
 /ios
+
+bun.lock

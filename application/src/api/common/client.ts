@@ -4,12 +4,9 @@ import { authService } from '@/service/auth-service';
 
 const TAG = '[API]';
 
-// API URL from environment variables
-// Production: https://api.hiringbull.org
-// For local dev, set EXPO_PUBLIC_API_URL in your .env.development file
-// const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.hiringbull.org';
-const BASE_URL = 'https://api.hiringbull.org';
-// const BASE_URL = 'http://10.84.13.219:4000';
+// API URL from .env — set EXPO_PUBLIC_API_URL to your local IP for dev
+// e.g. EXPO_PUBLIC_API_URL=http://10.x.x.x:4000
+const BASE_URL = Env.EXPO_PUBLIC_API_URL as string;
 
 console.log(`${TAG} Base URL: ${BASE_URL}`);
 
