@@ -6,6 +6,7 @@ import { Tabs, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import React, { useEffect, useRef } from 'react';
 import { AppState, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUserInfo, updatePushToken } from '@/features/users';
 import { useSingleDeviceSessionGuard } from '@/lib/hooks/useSingleDeviceSessionGuard';
@@ -19,6 +20,7 @@ import getOrCreateDeviceId from '@/utils/getOrCreatedId';
 import DeviceConflict from './outreach/deviceConflict';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const appState = useRef(AppState.currentState);
@@ -161,8 +163,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#4f46e5', // indigo-600
-        tabBarInactiveTintColor: '#a3a3a3', // neutral-400 (gray)
+        tabBarActiveTintColor: isDark ? '#ffffff' : '#0a0a0a', // black active (matches original main)
+        tabBarInactiveTintColor: '#a3a3a3', // neutral-400
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
@@ -170,11 +172,11 @@ export default function TabLayout() {
         },
         tabBarStyle: {
           backgroundColor: isDark ? '#000000' : '#ffffff',
-          borderTopColor: isDark ? '#333333' : '#f5f5f5',
+          borderTopColor: isDark ? '#262626' : '#f5f5f5',
           borderTopWidth: 1,
           paddingTop: 8,
-          paddingBottom: 8,
-          height: 64,
+          paddingBottom: Math.max(insets.bottom, 8),
+          height: 60 + insets.bottom,
         },
       }}
     >

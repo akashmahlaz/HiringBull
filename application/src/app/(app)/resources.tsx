@@ -173,34 +173,34 @@ function ResourceCard({ item }: { item: ResourceItem }) {
 
   return (
     <Pressable
-      className="h-[230px] flex-1 rounded-2xl border border-neutral-200 bg-white p-3 active:opacity-75"
+      className="h-[200px] flex-1 rounded-2xl border border-neutral-200 bg-white p-4 active:opacity-75"
       accessibilityRole="button"
       accessibilityLabel={title}
     >
       {/* Icon — LEFT aligned */}
-      <View className="mb-4 items-start">
+      <View className="mb-3 items-start">
         <Icon />
       </View>
 
-      {/* Title — bold, can wrap to 2 lines */}
+      {/* Title — bold */}
       <Text
-        className="mb-2 text-[14px] font-bold leading-[18px] text-neutral-900"
+        className="mb-1 text-[15px] font-bold leading-[20px] text-neutral-900"
         numberOfLines={2}
       >
         {title}
       </Text>
 
-      {/* Description — small gray, fills remaining space */}
+      {/* Description */}
       <Text
-        className="flex-1 text-[12px] leading-[17px] text-neutral-500"
-        numberOfLines={5}
+        className="text-[12px] leading-[17px] text-neutral-500"
+        numberOfLines={3}
       >
         {description}
       </Text>
 
-      {/* Chevron — bottom right */}
-      <View className="mt-2 items-end">
-        <Ionicons name="chevron-forward" size={14} color="#9ca3af" />
+      {/* Chevron — pinned to bottom right */}
+      <View className="mt-auto items-end">
+        <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
       </View>
     </Pressable>
   );
@@ -221,7 +221,7 @@ export default function Resources() {
   }, [searchQuery]);
 
   const rows = useMemo(
-    () => chunkArray(filteredResources, 3),
+    () => chunkArray(filteredResources, 2),
     [filteredResources]
   );
 
@@ -275,12 +275,12 @@ export default function Resources() {
             </View>
           ) : (
             rows.map((row, rowIdx) => (
-              <View key={rowIdx} className="mb-3 flex-row gap-3">
+              <View key={rowIdx} className="mb-4 flex-row gap-4">
                 {row.map((item) => (
                   <ResourceCard key={item.id} item={item} />
                 ))}
-                {row.length < 3 &&
-                  Array.from({ length: 3 - row.length }).map((_, i) => (
+                {row.length < 2 &&
+                  Array.from({ length: 2 - row.length }).map((_, i) => (
                     <View key={`ph-${i}`} className="flex-1" />
                   ))}
               </View>
