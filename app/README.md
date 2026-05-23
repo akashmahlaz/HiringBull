@@ -50,7 +50,7 @@ So the app loads variables from:
 
 ## 3. Create Environment File
 
-📁 **Path**: `application/.env.development`
+📁 **Path**: `app/.env.development`
 
 Add the following:
 
