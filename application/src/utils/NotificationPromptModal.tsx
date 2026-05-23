@@ -20,11 +20,8 @@ export const NotificationPromptModal: React.FC<Props> = ({
   onClose,
 }) => {
   const openAppSettings = () => {
-    if (Platform.OS === 'ios') {
-      Notifications.openSettings();
-    } else {
-      Linking.openSettings();
-    }
+    // Linking.openSettings() works on both iOS and Android
+    Linking.openSettings();
     onClose();
   };
 

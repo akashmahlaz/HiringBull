@@ -38,6 +38,9 @@ export type UserInfo = {
     "onboarding_completed_at":string|null,
     "followedCompanies": string[] | OnboardedCompanies,
     experience_level: ExperienceLevel,
+    isPaid?: boolean,
+    planExpiry?: string | null,
+    current_plan_end?: string | null,
 }
 
 export function isFollowedCompanyObject(followedCompanies:  string[] | OnboardedCompanies): followedCompanies is OnboardedCompanies {

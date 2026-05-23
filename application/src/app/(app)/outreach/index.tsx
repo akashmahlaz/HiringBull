@@ -119,7 +119,6 @@ export default function Outreach() {
   const { control, watch, setValue, reset } = form;
   const { data } = useMyProfile();
 
-
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
@@ -128,7 +127,7 @@ export default function Outreach() {
   const email = watch('email');
   const message = watch('message');
   const isFormValid = Boolean(email?.trim() && message?.trim());
-  const canSendNow = remaining && isFormValid;
+  const canSendNow = remaining !== undefined && remaining > 0 && isFormValid;
 
   const messageRef = useRef<TextInput>(null);
   const { mutate: sendOutreach, isPending } = useSendOutreach();
@@ -156,6 +155,8 @@ export default function Outreach() {
         companyName: selectedCompany.name,
         reason: values.reason,
         message: values.message,
+        jobId: values.jobId ?? '',
+        resumeLink: values.resumeLink,
       },
       {
         onSuccess: (res) => {
@@ -178,7 +179,7 @@ export default function Outreach() {
         },
         onError: (error) => {
           const apiMessage =
-            error.response?.data?.error ||
+            (error.response?.data as { error?: string } | undefined)?.error ||
             'Failed to send outreach. Please try again.';
 
           showToast({

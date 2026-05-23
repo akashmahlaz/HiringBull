@@ -43,8 +43,9 @@ export function useSingleDeviceSessionGuard() {
     if (isLoading) return false;
     if (!localDeviceId) return false;
 
-    // 👇 DB se active device id
-    const activeDeviceId = data?.devices?.[0]?.deviceId;
+    // DB se active device id
+    const activeDeviceId =
+      data?.devices?.[0]?.deviceId ?? data?.devices?.[0]?.id;
 
     if (!activeDeviceId) return false;
 

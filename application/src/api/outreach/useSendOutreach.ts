@@ -7,7 +7,7 @@ import type { OutreachRequest, OutreachResponse } from './types';
 export const useSendOutreach = createMutation<
   OutreachResponse,
   OutreachRequest,
-  AxiosError
+  AxiosError<{ error?: string }>
 >({
   mutationFn: async (variables) =>
     client({

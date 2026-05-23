@@ -1,3 +1,4 @@
+import React from 'react';
 import { ExperienceLevel } from '@/app/onboarding/types';
 import { useColorScheme } from 'nativewind';
 // import Animated,{FadeInRight,FadeOutLeft} from "react-native-reanimated";

@@ -1,9 +1,16 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useColorScheme } from 'nativewind';
 import { Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 // import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
-import { Checkbox, Text, View, ScrollView, Input, Image } from '@/components/ui';
+import {
+  Checkbox,
+  Text,
+  View,
+  ScrollView,
+  Input,
+  Image,
+} from '@/components/ui';
 import { TextInput } from 'react-native';
 import useFetchOnboardedCompanies from '@/app/onboarding/hooks/useFetchOnboardedCompanies';
 import LogoLoader from '@/components/logo-loader';
@@ -50,7 +57,16 @@ function Step2({
     return <LogoLoader />;
   }
 
-  const FILTERS = ['ALL', 'TECH_GIANT', 'INDIAN_STARTUP', 'GLOBAL_STARTUP', 'HFT', 'MASS_HIRING', 'FINTECH_GIANT', 'YCOMBINATOR'];
+  const FILTERS = [
+    'ALL',
+    'TECH_GIANT',
+    'INDIAN_STARTUP',
+    'GLOBAL_STARTUP',
+    'HFT',
+    'MASS_HIRING',
+    'FINTECH_GIANT',
+    'YCOMBINATOR',
+  ];
 
   const filterNameFormat = (name: string) => {
     let output = name.replace('_', ' ').toUpperCase();

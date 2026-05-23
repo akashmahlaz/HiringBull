@@ -16,6 +16,11 @@ import { GlobalLoadingOverlay } from '@/components/global-loading-overlay';
 import { Toast } from '@/components/ui/Toast';
 import { getUserInfo, updatePushToken } from '@/features/users';
 import { hydrateAuth, useAuth } from '@/lib/auth';
+import {
+  getMembership,
+  isMembershipValid,
+  saveMembership,
+} from '@/lib/membership';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 
@@ -105,7 +110,10 @@ function RootNavigator() {
       setIsLoadingUser(true);
       console.log('[RootLayout] checkUserInfo: fetching user info...');
       const data = await getUserInfo();
-      console.log('[RootLayout] checkUserInfo: onboarding_completed =', data.onboarding_completed);
+      console.log(
+        '[RootLayout] checkUserInfo: onboarding_completed =',
+        data.onboarding_completed
+      );
       if (Boolean(data.onboarding_completed)) {
         completeOnboarding();
         updateUserInfo(data);
@@ -113,8 +121,40 @@ function RootNavigator() {
       } else {
         console.log('[RootLayout] checkUserInfo: onboarding NOT completed yet');
       }
+
+      // Restore membership from server if local cache is missing or expired
+      const localMembership = getMembership();
+      const serverPlanEnd = data.current_plan_end || data.planExpiry;
+      console.log(
+        '[RootLayout] checkUserInfo: isPaid =',
+        data.isPaid,
+        '| serverPlanEnd =',
+        serverPlanEnd,
+        '| localMembership =',
+        JSON.stringify(localMembership)
+      );
+      if (
+        data.isPaid &&
+        serverPlanEnd &&
+        (!localMembership || !isMembershipValid(localMembership.membershipEnd))
+      ) {
+        const serverExpiry = new Date(serverPlanEnd);
+        if (serverExpiry > new Date()) {
+          saveMembership({
+            email: data.email,
+            membershipEnd: serverExpiry.toISOString(),
+          });
+          console.log(
+            '[RootLayout] checkUserInfo: Membership restored from server, expires',
+            serverExpiry.toISOString()
+          );
+        }
+      }
     } catch (e: any) {
-      console.error('[RootLayout] checkUserInfo: Failed to get user info:', e?.message || e);
+      console.error(
+        '[RootLayout] checkUserInfo: Failed to get user info:',
+        e?.message || e
+      );
     } finally {
       setIsLoadingUser(false);
       console.log('[RootLayout] checkUserInfo: done, isLoadingUser=false');
@@ -181,13 +221,6 @@ function RootNavigator() {
     <>
       {shouldInitNotifications && <NotificationInitializer />}
 
-      {/* DEBUG: Log nav guard state every render */}
-      {(() => {
-        console.log('[RootLayout:Render] isAuthenticated =', isAuthenticated, '| isLoadingUser =', isLoadingUser, '| hasCompletedOnboarding =', hasCompletedOnboarding);
-        console.log('[RootLayout:Render] Guards → login:', !isAuthenticated, '| onboarding:', !hasCompletedOnboarding, '| (app):', hasCompletedOnboarding);
-        return null;
-      })()}
-
       <Stack>
         {/* <Stack.Protected guard={isFirstTime}>
           <Stack.Screen name="landing" options={{ headerShown: false }} />
@@ -238,13 +271,13 @@ function Providers({ children }: { children: React.ReactNode }) {
     >
       <KeyboardProvider>
         <ThemeProvider value={theme}>
-            <APIProvider>
-              <BottomSheetModalProvider>
-                {children}
-                <Toast />
-                <GlobalLoadingOverlay />
-              </BottomSheetModalProvider>
-            </APIProvider>
+          <APIProvider>
+            <BottomSheetModalProvider>
+              {children}
+              <Toast />
+              <GlobalLoadingOverlay />
+            </BottomSheetModalProvider>
+          </APIProvider>
         </ThemeProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>

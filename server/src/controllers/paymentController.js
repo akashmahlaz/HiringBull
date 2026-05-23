@@ -331,13 +331,18 @@ const GOOGLE_PLAY_PRICE_MAP = {
  *         description: Server error
  */
 export const verifyGooglePlayPurchase = async (req, res) => {
-  log("[Payment] Google Play verify hit");
+  log("[Payment] ====== GOOGLE PLAY VERIFY ======");
+  log(`[Payment] req.user: id=${req.user?.id}, email=${req.user?.email}`);
+  log(`[Payment] req.body: ${JSON.stringify(req.body)}`);
 
   try {
     const { purchaseToken, productId, packageName } = req.body;
 
     // 1. Validate inputs
+    log(`[Payment] purchaseToken present=${!!purchaseToken}, length=${purchaseToken?.length || 0}`);
+    log(`[Payment] productId=${productId}, packageName=${packageName}`);
     if (!purchaseToken || !productId || !packageName) {
+      log(`[Payment] Missing fields: purchaseToken=${!!purchaseToken}, productId=${!!productId}, packageName=${!!packageName}`);
       return res.status(400).json({ success: false, error: "Missing required fields: purchaseToken, productId, packageName" });
     }
 
@@ -375,7 +380,14 @@ export const verifyGooglePlayPurchase = async (req, res) => {
     }
 
     let purchaseData;
-    const serviceAccountKey = JSON.parse(serviceAccountKeyRaw);
+    let serviceAccountKey;
+    try {
+      serviceAccountKey = JSON.parse(serviceAccountKeyRaw);
+      log(`[Payment] Service account parsed: project_id=${serviceAccountKey.project_id}, client_email=${serviceAccountKey.client_email}`);
+    } catch (parseErr) {
+      log(`[Payment] FAILED to parse GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: ${parseErr.message}`);
+      return res.status(500).json({ success: false, error: "Invalid service account key configuration" });
+    }
     const gpAuth = new google.auth.GoogleAuth({
       credentials: serviceAccountKey,
       scopes: ["https://www.googleapis.com/auth/androidpublisher"],
@@ -383,7 +395,7 @@ export const verifyGooglePlayPurchase = async (req, res) => {
     const androidPublisher = google.androidpublisher({ version: "v3", auth: gpAuth });
 
     try {
-
+      log(`[Payment] Calling Google Play API: packageName=${packageName}, productId=${productId}, token length=${purchaseToken.length}`);
       const result = await androidPublisher.purchases.products.get({
         packageName,
         productId,
@@ -393,8 +405,9 @@ export const verifyGooglePlayPurchase = async (req, res) => {
       purchaseData = result.data;
       log("[Payment] Google Play API response:", JSON.stringify(purchaseData));
     } catch (apiErr) {
-      log("[Payment] Google Play API error:", apiErr.message);
-      return res.status(400).json({ success: false, error: "Failed to verify purchase with Google Play" });
+      log(`[Payment] Google Play API FAILED: ${apiErr.message}`);
+      log(`[Payment] Google Play API error details: status=${apiErr.response?.status}, data=${JSON.stringify(apiErr.response?.data)}`);
+      return res.status(400).json({ success: false, error: "Failed to verify purchase with Google Play", detail: apiErr.message });
     }
 
     // 5. Validate purchase state
@@ -441,8 +454,10 @@ export const verifyGooglePlayPurchase = async (req, res) => {
     log(`[Payment] Google Play purchase verified for ${email}, plan: ${planType}`);
     return res.json({ success: true });
   } catch (err) {
+    log(`[Payment] Google Play verify UNCAUGHT error: ${err.message}`);
+    log(`[Payment] Stack: ${err.stack}`);
     console.error("[Payment] Google Play verify error:", err);
-    return res.status(500).json({ success: false, error: "Internal server error" });
+    return res.status(500).json({ success: false, error: "Internal server error", detail: err.message });
   }
 };
 

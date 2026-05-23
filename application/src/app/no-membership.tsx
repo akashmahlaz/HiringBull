@@ -1,3 +1,4 @@
+import React from 'react';
 import { useAuth } from '@/lib/auth';
 import { FontAwesome6, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -85,7 +86,9 @@ export default function NoActiveMembership() {
 
         <Pressable
           onPress={() => {
-            console.log('[NoMembership] "Get Membership" pressed → navigating to /payment');
+            console.log(
+              '[NoMembership] "Get Membership" pressed → navigating to /payment'
+            );
             router.push('/payment');
           }}
           className="rounded-xl bg-black py-4"

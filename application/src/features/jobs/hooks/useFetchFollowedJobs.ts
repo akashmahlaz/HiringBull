@@ -8,7 +8,8 @@ export const useFetchFollowedJobs = () => {
   const { isSignedIn } = useAuth();
   return useInfiniteQuery<JobsResponse, Error>({
     queryKey: [QueryKeys.followedJobs],
-    queryFn: ({ pageParam }) => fetchFollowedJobs({ pageParam: pageParam as number }),
+    queryFn: ({ pageParam }) =>
+      fetchFollowedJobs({ pageParam: pageParam as number }),
     enabled: !!isSignedIn,
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {
@@ -21,7 +22,7 @@ export const useFetchFollowedJobs = () => {
       return undefined;
     },
     staleTime: TEN_MINUTES,
-    cacheTime: 30 * 60 * 1000, // keep cache for 30 mins
+    gcTime: 30 * 60 * 1000, // keep cache for 30 mins
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
   });

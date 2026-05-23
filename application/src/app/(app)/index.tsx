@@ -178,7 +178,10 @@ export default function Jobs() {
 
   // Flatten all pages
   const allJobs = useMemo(
-    () => data?.pages.flatMap((page) => page.data || []) || [],
+    () =>
+      (data?.pages ?? []).flatMap(
+        (page) => (page as { data: ApiJob[] })?.data ?? []
+      ),
     [data]
   );
 
@@ -197,7 +200,7 @@ export default function Jobs() {
       if (!selectedTags.length) return true;
 
       // Filter by tags
-      const jobTags = Array.from(new Set(job.tags || []));
+      const jobTags: string[] = Array.from(new Set(job.tags ?? []));
       return selectedTags.some((tag) =>
         jobTags.some(
           (jobTag: string) => jobTag.toLowerCase() === tag.toLowerCase()
@@ -384,7 +387,7 @@ export default function Jobs() {
                 </Text>
               </View>
             }
-            ListFooterComponent={filteredJobs?.length > 0 && renderFooter}
+            ListFooterComponent={filteredJobs?.length > 0 ? renderFooter : null}
           />
         )}
       </View>
@@ -394,7 +397,6 @@ export default function Jobs() {
         snapPoints={['60%']}
         title="Filter Jobs"
         onDismiss={dismiss}
-        propagateSwipe={true}
       >
         <View className="px-4 py-2" style={{ flex: 1 }}>
           <Text className="mb-4 text-base font-medium text-neutral-700">

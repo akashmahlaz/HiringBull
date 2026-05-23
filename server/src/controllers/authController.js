@@ -120,7 +120,8 @@ const generateOtp = async (email) => {
  */
 export const googleLogin = catchAsync(async (req, res) => {
   const { idToken } = req.body;
-  log(`[Auth:Google] Login attempt`);
+  log(`[Auth:Google] ====== LOGIN ATTEMPT ======`);
+  log(`[Auth:Google] idToken present: ${!!idToken}, length: ${idToken?.length || 0}`);
   if (!idToken) {
     log(`[Auth:Google] Missing idToken`);
     return res.status(httpStatus.BAD_REQUEST).json({ message: "idToken is required" });
@@ -128,33 +129,48 @@ export const googleLogin = catchAsync(async (req, res) => {
 
   // Verify the Google ID token
   const googleClient = new OAuth2Client();
-  const ticket = await googleClient.verifyIdToken({
-    idToken,
-    // Accept tokens from any of our client IDs (Android, iOS, Web)
-    audience: [
-      process.env.GOOGLE_CLIENT_ID_ANDROID,
-      process.env.GOOGLE_CLIENT_ID_IOS,
-      process.env.GOOGLE_CLIENT_ID_WEB,
-    ].filter(Boolean),
-  });
+  const allowedAudiences = [
+    process.env.GOOGLE_CLIENT_ID_ANDROID,
+    process.env.GOOGLE_CLIENT_ID_IOS,
+    process.env.GOOGLE_CLIENT_ID_WEB,
+  ].filter(Boolean);
+  log(`[Auth:Google] Allowed audiences: ${JSON.stringify(allowedAudiences)}`);
+
+  let ticket;
+  try {
+    ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: allowedAudiences,
+    });
+    log(`[Auth:Google] Token verification SUCCESS`);
+  } catch (verifyErr) {
+    log(`[Auth:Google] Token verification FAILED: ${verifyErr.message}`);
+    log(`[Auth:Google] Full verify error: ${JSON.stringify({ name: verifyErr.name, message: verifyErr.message, stack: verifyErr.stack?.split('\n')[0] })}`);
+    return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid Google token", detail: verifyErr.message });
+  }
 
   const payload = ticket.getPayload();
+  log(`[Auth:Google] Payload: email=${payload?.email}, name=${payload?.name}, sub=${payload?.sub}, aud=${payload?.aud}`);
   if (!payload?.email) {
     log(`[Auth:Google] Token verified but no email in payload`);
     return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid Google token" });
   }
 
   log(`[Auth:Google] Token verified for ${payload.email}`);
-  const { token, user } = await findOrCreateUser({
-    email: payload.email,
-    name: payload.name,
-    provider: "google",
-    providerId: payload.sub,
-    imgUrl: payload.picture,
-  });
-
-  log(`[Auth:Google] Login success: userId=${user.id}`);
-  res.status(httpStatus.OK).json({ token, user });
+  try {
+    const { token, user } = await findOrCreateUser({
+      email: payload.email,
+      name: payload.name,
+      provider: "google",
+      providerId: payload.sub,
+      imgUrl: payload.picture,
+    });
+    log(`[Auth:Google] Login success: userId=${user.id}`);
+    res.status(httpStatus.OK).json({ token, user });
+  } catch (dbErr) {
+    log(`[Auth:Google] DB error in findOrCreateUser: ${dbErr.message}`);
+    throw dbErr;
+  }
 });
 
 // ─── LinkedIn OpenID Connect ────────────────────────────────
@@ -273,7 +289,10 @@ export const linkedinLogin = catchAsync(async (req, res) => {
 //
 
 const LINKEDIN_SCOPES = "openid profile email";
-const APP_DEEP_LINK = "exp+hiringbull-nayak://login";
+const IS_PRODUCTION = process.env.NODE_ENV === "production" || (process.env.SERVER_URL || "").includes("hiringbull.org");
+const APP_DEEP_LINK = IS_PRODUCTION
+  ? "hiringbull://login"
+  : "exp+hiringbull-nayak://login";
 
 /**
  * @swagger
@@ -352,37 +371,67 @@ export const linkedinCallbackOAuth = catchAsync(async (req, res) => {
   const serverUrl = process.env.SERVER_URL || `http://${req.headers.host}`;
   const callbackUrl = `${serverUrl}/api/auth/linkedin/callback`;
 
+  log(`[Auth:LinkedIn:Mobile] ====== CALLBACK ======`);
   log(`[Auth:LinkedIn:Mobile] Exchanging code, callbackUrl=${callbackUrl}`);
+  log(`[Auth:LinkedIn:Mobile] clientId=${clientId}, clientSecret present=${!!clientSecret}, clientSecret length=${clientSecret?.length || 0}`);
+  log(`[Auth:LinkedIn:Mobile] APP_DEEP_LINK=${APP_DEEP_LINK}`);
+  log(`[Auth:LinkedIn:Mobile] IS_PRODUCTION=${IS_PRODUCTION}, NODE_ENV=${process.env.NODE_ENV}`);
 
   // 1) Exchange code for access token
-  const tokenResponse = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: callbackUrl,
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  });
+  let tokenResponse;
+  try {
+    tokenResponse = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: callbackUrl,
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+      signal: AbortSignal.timeout(10000), // 10s timeout
+    });
+  } catch (fetchErr) {
+    log(`[Auth:LinkedIn:Mobile] Token exchange FETCH ERROR: ${fetchErr.message}`);
+    const errorRedirect = `${APP_DEEP_LINK}?error=${encodeURIComponent("LinkedIn connection timed out. Please try again.")}`;
+    return res.redirect(errorRedirect);
+  }
 
   if (!tokenResponse.ok) {
     const errBody = await tokenResponse.text();
-    log(`[Auth:LinkedIn:Mobile] Token exchange failed: ${tokenResponse.status} ${errBody}`);
+    log(`[Auth:LinkedIn:Mobile] Token exchange FAILED: status=${tokenResponse.status}, body=${errBody}`);
     const errorRedirect = `${APP_DEEP_LINK}?error=${encodeURIComponent("LinkedIn authentication failed")}`;
+    log(`[Auth:LinkedIn:Mobile] Redirecting to error: ${errorRedirect}`);
     return res.redirect(errorRedirect);
   }
 
   const tokenData = await tokenResponse.json();
-  log(`[Auth:LinkedIn:Mobile] Token exchange successful`);
+  log(`[Auth:LinkedIn:Mobile] Token exchange SUCCESS, access_token present=${!!tokenData.access_token}`);
 
-  // 2) Fetch user profile
-  const userInfoResponse = await fetch("https://api.linkedin.com/v2/userinfo", {
-    headers: { Authorization: `Bearer ${tokenData.access_token}` },
-  });
+  // 2) Fetch user profile (with timeout + retry for EC2 network issues)
+  let userInfoResponse;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      log(`[Auth:LinkedIn:Mobile] Fetching userinfo (attempt ${attempt})...`);
+      userInfoResponse = await fetch("https://api.linkedin.com/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        signal: AbortSignal.timeout(10000), // 10s timeout
+      });
+      if (userInfoResponse.ok) break;
+    } catch (fetchErr) {
+      log(`[Auth:LinkedIn:Mobile] Userinfo fetch error (attempt ${attempt}): ${fetchErr.message}`);
+      if (attempt === 2) {
+        const errorRedirect = `${APP_DEEP_LINK}?error=${encodeURIComponent("LinkedIn profile fetch timed out. Please try again.")}`;
+        return res.redirect(errorRedirect);
+      }
+    }
+  }
 
-  if (!userInfoResponse.ok) {
+  if (!userInfoResponse || !userInfoResponse.ok) {
+    let errBody2 = '';
+    try { errBody2 = await userInfoResponse?.text(); } catch {}
+    log(`[Auth:LinkedIn:Mobile] Userinfo FAILED: status=${userInfoResponse?.status}, body=${errBody2}`);
     const errorRedirect = `${APP_DEEP_LINK}?error=${encodeURIComponent("Failed to fetch LinkedIn profile")}`;
     return res.redirect(errorRedirect);
   }
@@ -394,21 +443,28 @@ export const linkedinCallbackOAuth = catchAsync(async (req, res) => {
     return res.redirect(errorRedirect);
   }
 
-  log(`[Auth:LinkedIn:Mobile] Profile: email=${profile.email}, name=${profile.name}`);
+  log(`[Auth:LinkedIn:Mobile] Profile: email=${profile.email}, name=${profile.name}, sub=${profile.sub}`);
+  log(`[Auth:LinkedIn:Mobile] Full profile: ${JSON.stringify(profile)}`);
 
   // 3) Find or create user + JWT
-  const { token, user } = await findOrCreateUser({
-    email: profile.email,
-    name: profile.name,
-    provider: "linkedin",
-    providerId: profile.sub,
-    imgUrl: profile.picture || null,
-  });
+  try {
+    const { token, user } = await findOrCreateUser({
+      email: profile.email,
+      name: profile.name,
+      provider: "linkedin",
+      providerId: profile.sub,
+      imgUrl: profile.picture || null,
+    });
 
-  // 4) Redirect to app deep link with the JWT
-  const successRedirect = `${APP_DEEP_LINK}?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(user.id)}`;
-  log(`[Auth:LinkedIn:Mobile] Success, redirecting to app deep link`);
-  res.redirect(successRedirect);
+    // 4) Redirect to app deep link with the JWT
+    const successRedirect = `${APP_DEEP_LINK}?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(user.id)}`;
+    log(`[Auth:LinkedIn:Mobile] Success, redirecting to: ${successRedirect}`);
+    res.redirect(successRedirect);
+  } catch (dbErr) {
+    log(`[Auth:LinkedIn:Mobile] DB error: ${dbErr.message}`);
+    const errorRedirect = `${APP_DEEP_LINK}?error=${encodeURIComponent(dbErr.message)}`;
+    res.redirect(errorRedirect);
+  }
 });
 
 // ─── Email OTP ──────────────────────────────────────────────
