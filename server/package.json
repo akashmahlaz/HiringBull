@@ -1,16 +1,19 @@
 {
     "name": "hiringbull-server",
-    "version": "0.1.0",
+    "version": "1.1.0",
     "private": true,
-    "main": "src/index.js",
+    "main": "dist/index.js",
     "type": "module",
     "scripts": {
-        "start": "node --enable-source-maps src/index.js",
-        "dev": "nodemon --watch src --exec node --enable-source-maps src/index.js",
-        "lint": "eslint ."
+        "start": "node dist/index.js",
+        "dev": "nodemon --watch src --exec node dist/index.js",
+        "build": "tsc",
+        "lint": "eslint .",
+        "tsc": "tsc --noemit",
+        "prisma:generate": "npx prisma generate"
     },
     "engines": {
-        "node": ">=18"
+        "node": ">=24"
     },
     "dependencies": {
         "@prisma/client": "^5.22.0",
@@ -31,11 +34,17 @@
         "resend": "^6.9.2",
         "swagger-jsdoc": "^6.2.8",
         "swagger-ui-express": "^5.0.1",
+        "typescript": "^6.0.3",
         "xss": "^1.0.15"
     },
     "devDependencies": {
-        "eslint": "^8.0.0",
-        "nodemon": "^2.0.20",
-        "prisma": "^5.22.0"
+        "@types/express": "^5.0.0",
+        "@types/node": "^22.0.0",
+        "@types/jwt-decode": "^3.3.0",
+        "eslint": "^10.4.0",
+        "nodemon": "^3.1.14",
+        "prisma": "^7.8.0",
+        "ts-node": "^10.9.0",
+        "typescript": "^6.0.3"
     }
 }

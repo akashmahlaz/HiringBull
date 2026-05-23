@@ -1,10 +1,20 @@
 <h1 align="center">
   <img alt="logo" src="./assets/icon.png" width="124px" style="border-radius:10px"/><br/>
 Mobile App </h1>
-> This Project is based on [Obytes starter](https://starter.obytes.com)
-# HiringBull – Expo + Android + Clerk Setup
+> HiringBull Mobile Application - Job Discovery Platform for Students & Early-Career Developers
 
-This README documents **all required setup steps** to run the app locally, including **Android**, **Expo**, and **Clerk authentication** configuration.
+# HiringBull Mobile App
+
+Expo + React Native mobile application for HiringBull - a job discovery platform for students and early-career developers.
+
+## Features
+- 🔍 Job and internship discovery
+- 💼 Company profiles and details
+- 🎯 Personalized recommendations
+- 💰 Membership and payment integration
+- 👤 User authentication (Google, LinkedIn, Email OTP)
+- 🔔 Push notifications
+- 📱 Native Android experience
 
 ---
 
