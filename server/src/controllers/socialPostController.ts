@@ -1,10 +1,19 @@
-import prisma from '../prismaClient.js';
-import httpStatus from 'http-status';
-import { getPagination, getPaginationMeta } from '../utils/pagination.js';
+import { Request, Response, NextFunction } from "express";
+import prisma from "../prismaClient.js";
+import httpStatus from "http-status";
+import { getPagination, getPaginationMeta } from "../utils/pagination.js";
 
-const catchAsync = (fn) => (req, res, next) => {
+const catchAsync =
+  (
+    fn: (
+      req: Request,
+      res: Response,
+      next: NextFunction,
+    ) => Promise<void | Response>,
+  ) =>
+  (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch((err) => next(err));
-};
+  };
 
 /**
  * @swagger
@@ -28,20 +37,23 @@ const catchAsync = (fn) => (req, res, next) => {
  *       200:
  *         description: Success
  */
-export const getAllSocialPosts = catchAsync(async (req, res) => {
+export const getAllSocialPosts = catchAsync(
+  async (req: Request, res: Response) => {
     const { source, company, segment } = req.query;
-    const { skip, take, page, limit } = getPagination(req.query);
+    const { skip, take, page, limit } = getPagination(
+      req.query as Record<string, string | undefined>,
+    );
 
     // Build filter
-    const where = {};
+    const where: Record<string, unknown> = {};
     if (source) {
-        where.source = source;
+      where.source = source;
     }
     if (company) {
-        where.company = company;
+      where.company = company;
     }
     if (segment) {
-        where.segment = segment;
+      where.segment = segment;
     }
 
     // Get total count for pagination
@@ -49,19 +61,20 @@ export const getAllSocialPosts = catchAsync(async (req, res) => {
 
     // Get paginated posts
     const posts = await prisma.socialPost.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { created_at: 'desc' },
+      where,
+      skip,
+      take,
+      orderBy: { created_at: "desc" },
     });
 
     const pagination = getPaginationMeta(totalCount, page, limit);
 
     res.status(httpStatus.OK).json({
-        data: posts,
-        pagination,
+      data: posts,
+      pagination,
     });
-});
+  },
+);
 
 /**
  * @swagger
@@ -75,26 +88,30 @@ export const getAllSocialPosts = catchAsync(async (req, res) => {
  *       200:
  *         description: Success
  */
-export const getAllSocialPostsOnly = catchAsync(async (req, res) => {
-    const { skip, take, page, limit } = getPagination(req.query);
+export const getAllSocialPostsOnly = catchAsync(
+  async (req: Request, res: Response) => {
+    const { skip, take, page, limit } = getPagination(
+      req.query as Record<string, string | undefined>,
+    );
 
     // Get total count for pagination
     const totalCount = await prisma.socialPost.count();
 
     // Get paginated posts
     const posts = await prisma.socialPost.findMany({
-        skip,
-        take,
-        orderBy: { created_at: 'desc' },
+      skip,
+      take,
+      orderBy: { created_at: "desc" },
     });
 
     const pagination = getPaginationMeta(totalCount, page, limit);
 
     res.status(httpStatus.OK).json({
-        data: posts,
-        pagination,
+      data: posts,
+      pagination,
     });
-});
+  },
+);
 
 /**
  * @swagger
@@ -115,32 +132,37 @@ export const getAllSocialPostsOnly = catchAsync(async (req, res) => {
  *       404:
  *         description: Not found
  */
-export const getSocialPostById = catchAsync(async (req, res) => {
+export const getSocialPostById = catchAsync(
+  async (req: Request, res: Response) => {
     const { id } = req.params;
     const post = await prisma.socialPost.findUnique({
-        where: { id },
-        include: {
-            comments: {
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            img_url: true,
-                        },
-                    },
-                },
-                orderBy: { createdAt: 'desc' },
+      where: { id },
+      include: {
+        comments: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                img_url: true,
+              },
             },
+          },
+          orderBy: { createdAt: "desc" },
         },
+      },
     });
 
     if (!post) {
-        return res.status(httpStatus.NOT_FOUND).json({ message: 'Social post not found' });
+      res
+        .status(httpStatus.NOT_FOUND)
+        .json({ message: "Social post not found" });
+      return;
     }
 
     res.status(httpStatus.OK).json(post);
-});
+  },
+);
 
 /**
  * @swagger
@@ -162,16 +184,18 @@ export const getSocialPostById = catchAsync(async (req, res) => {
  *       201:
  *         description: Created
  */
-export const bulkCreateSocialPosts = catchAsync(async (req, res) => {
+export const bulkCreateSocialPosts = catchAsync(
+  async (req: Request, res: Response) => {
     const postsData = req.body;
 
     const count = await prisma.socialPost.createMany({
-        data: postsData,
-        skipDuplicates: true,
+      data: postsData,
+      skipDuplicates: true,
     });
 
     res.status(httpStatus.CREATED).json({
-        message: 'Bulk social post creation completed',
-        count: count.count,
+      message: "Bulk social post creation completed",
+      count: count.count,
     });
-});
+  },
+);

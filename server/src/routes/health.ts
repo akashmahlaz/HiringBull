@@ -1,7 +1,8 @@
-import express from "express";
+import express, { Request, Response } from "express";
+
 const router = express.Router();
 
-router.get("/", (req, res) => {
+router.get("/", (_req: Request, res: Response) => {
   res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
 });
 

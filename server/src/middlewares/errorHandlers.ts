@@ -1,23 +1,37 @@
-import httpStatus from 'http-status';
-import { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+import { Request, Response, NextFunction } from "express";
+import httpStatus from "http-status";
 
-export const notFoundHandler = (req: Request, res: Response, _next: NextFunction): void => {
-  res.status(httpStatus.NOT_FOUND).json({ code: httpStatus.NOT_FOUND, message: 'Not Found' });
+interface HttpError extends Error {
+  statusCode?: number;
+  status?: number;
+}
+
+export const notFoundHandler = (
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+): void => {
+  res
+    .status(httpStatus.NOT_FOUND)
+    .json({ code: httpStatus.NOT_FOUND, message: "Not Found" });
 };
 
-export const errorHandler: ErrorRequestHandler = (
-  err: Error & { statusCode?: number; stack?: string },
-  req: Request,
+export const errorHandler = (
+  err: HttpError,
+  _req: Request,
   res: Response,
-  _next: NextFunction
+  _next: NextFunction,
 ): void => {
   console.error(err);
-  const statusCode = err.statusCode || httpStatus.INTERNAL_SERVER_ERROR;
-  const message = err.message || httpStatus[statusCode];
+  const statusCode =
+    err.statusCode ||
+    err.status ||
+    (httpStatus.INTERNAL_SERVER_ERROR as number);
+  const message = err.message || "Internal Server Error";
 
   res.status(statusCode).json({
     code: statusCode,
     message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 };

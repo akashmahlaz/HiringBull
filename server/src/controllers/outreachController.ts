@@ -1,4 +1,10 @@
-import prisma from '../prismaClient.js';
+import { Request, Response } from "express";
+import prisma from "../prismaClient.js";
+
+type TxClient = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
 
 /**
  * @swagger
@@ -64,12 +70,15 @@ import prisma from '../prismaClient.js';
  *       500:
  *         description: Internal server error
  */
-export const createOutreachRequest = async (req, res) => {
+export const createOutreachRequest = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.user.id;
+    const userId = req.user!.id;
     const { email, companyName, reason, jobId, resumeLink, message } = req.body;
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: TxClient) => {
       // 1️⃣ Fetch token count
       const user = await tx.user.findUnique({
         where: { id: userId },
@@ -77,12 +86,12 @@ export const createOutreachRequest = async (req, res) => {
       });
 
       if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
       }
 
       // 2️⃣ Enforce token availability
-      if (user.tokens_left <= 0) {
-        return { error: 'NO_TOKENS' };
+      if (!user.tokens_left || user.tokens_left <= 0) {
+        return { error: "NO_TOKENS" as const };
       }
 
       // 3️⃣ Decrement token
@@ -109,16 +118,19 @@ export const createOutreachRequest = async (req, res) => {
       return { outreach };
     });
 
-    if (result?.error === 'NO_TOKENS') {
-      return res.status(403).json({
-        message: 'No tokens left',
+    if ("error" in result && result.error === "NO_TOKENS") {
+      res.status(403).json({
+        message: "No tokens left",
       });
+      return;
     }
 
-    return res.status(201).json(result.outreach);
+    if ("outreach" in result) {
+      res.status(201).json(result.outreach);
+    }
   } catch (error) {
-    console.error('Create outreach error:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("Create outreach error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -145,20 +157,23 @@ export const createOutreachRequest = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-export const getMyOutreachRequests = async (req, res) => {
-    try {
-        const userId = req.user.id;
+export const getMyOutreachRequests = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const userId = req.user!.id;
 
-        const outreaches = await prisma.outreachRequest.findMany({
-            where: { userId },
-            orderBy: { createdAt: 'desc' },
-        });
+    const outreaches = await prisma.outreachRequest.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
 
-        return res.status(200).json(outreaches);
-    } catch (error) {
-        console.error('Get my outreaches error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
+    res.status(200).json(outreaches);
+  } catch (error) {
+    console.error("Get my outreaches error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 /**
@@ -192,29 +207,32 @@ export const getMyOutreachRequests = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-export const getOutreachById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user.id;
+export const getOutreachById = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
 
-        const outreach = await prisma.outreachRequest.findFirst({
-            where: {
-                id,
-                userId,
-            },
-        });
+    const outreach = await prisma.outreachRequest.findFirst({
+      where: {
+        id,
+        userId,
+      },
+    });
 
-        if (!outreach) {
-            return res.status(404).json({ message: 'Outreach request not found' });
-        }
-
-        return res.status(200).json(outreach);
-    } catch (error) {
-        console.error('Get outreach error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+    if (!outreach) {
+      res.status(404).json({ message: "Outreach request not found" });
+      return;
     }
-};
 
+    res.status(200).json(outreach);
+  } catch (error) {
+    console.error("Get outreach error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 /**
  * @swagger
@@ -239,20 +257,22 @@ export const getOutreachById = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-export const getPendingOutreachRequests = async (req, res) => {
-    try {
-        const pending = await prisma.outreachRequest.findMany({
-            where: { status: 'PENDING' },
-            orderBy: { createdAt: 'asc' },
-        });
+export const getPendingOutreachRequests = async (
+  _req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const pending = await prisma.outreachRequest.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "asc" },
+    });
 
-        return res.status(200).json(pending);
-    } catch (error) {
-        console.error('Get pending outreaches error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
+    res.status(200).json(pending);
+  } catch (error) {
+    console.error("Get pending outreaches error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
-
 
 /**
  * @swagger
@@ -300,32 +320,36 @@ export const getPendingOutreachRequests = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-export const updateOutreachStatus = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { status } = req.body;
+export const updateOutreachStatus = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
 
-        if (!['APPROVED', 'REJECTED', 'SENT'].includes(status)) {
-            return res.status(400).json({ message: 'Invalid status value' });
-        }
-
-        const updateData = {
-            status,
-            reviewedAt: new Date(),
-        };
-
-        if (status === 'SENT') {
-            updateData.sentAt = new Date();
-        }
-
-        const outreach = await prisma.outreachRequest.update({
-            where: { id },
-            data: updateData,
-        });
-
-        return res.status(200).json(outreach);
-    } catch (error) {
-        console.error('Update outreach status error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+    if (!["APPROVED", "REJECTED", "SENT"].includes(status)) {
+      res.status(400).json({ message: "Invalid status value" });
+      return;
     }
+
+    const updateData: Record<string, unknown> = {
+      status,
+      reviewedAt: new Date(),
+    };
+
+    if (status === "SENT") {
+      updateData.sentAt = new Date();
+    }
+
+    const outreach = await prisma.outreachRequest.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.status(200).json(outreach);
+  } catch (error) {
+    console.error("Update outreach status error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };

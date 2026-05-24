@@ -1,9 +1,9 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import prisma from "../prismaClient.js";
 
 const router = express.Router();
 
-router.get("/", (req, res) => {
+router.get("/", (_req: Request, res: Response) => {
   res.json({
     status: "ok",
     message: "Application route is running",
@@ -11,22 +11,22 @@ router.get("/", (req, res) => {
   });
 });
 
-router.post("/", async (req, res) => {
+interface PrismaError {
+  code?: string;
+  message?: string;
+}
+
+router.post("/", async (req: Request, res: Response) => {
   try {
-    const {
-      full_name,
-      email,
-      phone,
-      social_profile,
-      reason,
-    } = req.body;
+    const { full_name, email, phone, social_profile, reason } = req.body;
 
     // ✅ Minimal required fields
     if (!full_name || !email || !social_profile || !reason) {
-      return res.status(400).json({
+      res.status(400).json({
         status: "error",
         message: "Missing required fields",
       });
+      return;
     }
 
     const application = await prisma.application.create({
@@ -40,7 +40,7 @@ router.post("/", async (req, res) => {
       },
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       status: "ok",
       message: "Application submitted successfully",
       data: application,
@@ -48,16 +48,18 @@ router.post("/", async (req, res) => {
     });
   } catch (error) {
     // ✅ Unique email constraint
-    if (error.code === "P2002") {
-      return res.status(409).json({
+    const prismaError = error as PrismaError;
+    if (prismaError.code === "P2002") {
+      res.status(409).json({
         status: "error",
         message: "An application with this email already exists",
       });
+      return;
     }
 
     console.error("❌ Application create error:", error);
 
-    return res.status(500).json({
+    res.status(500).json({
       status: "error",
       message: "Internal server error",
     });
