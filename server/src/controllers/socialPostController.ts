@@ -134,7 +134,7 @@ export const getAllSocialPostsOnly = catchAsync(
  */
 export const getSocialPostById = catchAsync(
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const post = await prisma.socialPost.findUnique({
       where: { id },
       include: {

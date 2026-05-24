@@ -146,7 +146,7 @@ export const bulkCreateCompanies = catchAsync(
  *         description: Not found
  */
 export const updateCompany = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, description, logo, category } = req.body;
 
   const company = await prisma.company.findUnique({ where: { id } });

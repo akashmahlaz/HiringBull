@@ -148,7 +148,7 @@ export const getAllFreeJobs = catchAsync(
  *         description: Not found
  */
 export const getJobById = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const job = await prisma.job.findUnique({
     where: { id },
     include: {
@@ -270,7 +270,11 @@ export const bulkCreateJobs = catchAsync(
           });
 
           if (createdJob) {
-            await sendJobNotificationToFollowers(job.companyId, createdJob);
+            await sendJobNotificationToFollowers(job.companyId, {
+              ...createdJob,
+              companyId: createdJob.companyId ?? undefined,
+              segment: createdJob.segment ?? undefined,
+            });
           }
         } catch (error) {
           const message =

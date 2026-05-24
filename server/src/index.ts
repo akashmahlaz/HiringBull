@@ -63,4 +63,8 @@ app.use("/api/v1", routes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+app.listen(PORT, () => {
+  console.log(`HiringBull API listening on port ${PORT}`);
+});
+
 export default app;

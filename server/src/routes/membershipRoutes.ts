@@ -63,7 +63,7 @@ router.post("/", async (req: Request, res: Response) => {
  */
 router.get("/:email", async (req: Request, res: Response) => {
   try {
-    const { email } = req.params;
+    const email = req.params.email as string;
 
     const membership = await prisma.membershipApplication.findUnique({
       where: { email },
@@ -96,7 +96,7 @@ router.get("/:email", async (req: Request, res: Response) => {
  */
 router.get("/active/:email", async (req: Request, res: Response) => {
   try {
-    const { email } = req.params;
+    const email = req.params.email as string;
     const now = new Date();
 
     const membership = await prisma.membershipApplication.findUnique({

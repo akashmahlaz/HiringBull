@@ -152,7 +152,7 @@ export const checkWebRegistration = catchAsync(
  */
 export const updateWebRegistration = catchAsync(
   async (req: Request, res: Response) => {
-    const { email } = req.params;
+    const email = req.params.email as string;
     const updateBody = req.body;
 
     const registration = await prisma.webRegistration.findUnique({
@@ -209,7 +209,7 @@ export const updateWebRegistration = catchAsync(
  */
 export const deleteWebRegistration = catchAsync(
   async (req: Request, res: Response) => {
-    const { email } = req.params;
+    const email = req.params.email as string;
 
     const registration = await prisma.webRegistration.findUnique({
       where: { email },

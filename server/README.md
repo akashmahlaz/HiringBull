@@ -2,23 +2,25 @@
 
 Backend API server for HiringBull – a comprehensive platform for onboarding users, managing jobs, companies, payments (IAP), referrals, and notifications.
 
-## 🚀 Tech Stack
+## Tech Stack
 
 - **Runtime**: Node.js (>= 24)
 - **Language**: **TypeScript** (fully typed)
 - **Framework**: Express.js
-- **Database**: PostgreSQL (via Prisma ORM)
+- **Database**: PostgreSQL (via Prisma ORM 7)
 - **Authentication**: JWT + Google/LinkedIn OAuth, Email OTP
 - **Validation**: Joi
 - **Payments**: Google Play Billing (IAP)
 - **API Documentation**: Swagger/OpenAPI
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 server/
-├── prisma/             # Database schema (schema.prisma)
+├── prisma/             # Database schema and migrations
+├── prisma.config.ts    # Prisma 7 CLI datasource/config
 ├── src/
+│   ├── generated/      # Prisma 7 generated client
 │   ├── types/          # TypeScript type definitions
 │   ├── controllers/    # Request handlers + Business Logic
 │   ├── middlewares/    # Request interceptors
@@ -30,52 +32,53 @@ server/
 └── package.json
 ```
 
-## 🛠️ Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js >= 24 installed on your machine.
 - A running PostgreSQL database.
-- pnpm (recommended) or npm
+- Bun 1.3+
 
 ### Installation
 1. Clone the repository and navigate to the server directory.
 2. Install dependencies:
    ```bash
-   pnpm install
+  bun install
    ```
 
 ### Build & Run
 ```bash
 # Build TypeScript
-pnpm run build
+bun run build
 
 # Run in production
-pnpm start
+bun start
 
 # Run in development (with hot reload)
-pnpm dev
+bun dev
 ```
 
 ### Database Setup
-1. Configure your `DATABASE_URL` in the `.env` file.
+1. Configure `DATABASE_URL` and `DIRECT_URL` in the `.env` file.
 2. Generate Prisma client:
    ```bash
-   npx prisma generate
+  bun run prisma:generate
    ```
-3. Push the schema to your database:
+3. Apply migrations in production:
    ```bash
-   npx prisma db push
+  bunx prisma migrate deploy
    ```
 
 ---
 
-## 🔑 Environment Variables
+## Environment Variables
 
 Create a `.env` file in the root of the `server/` directory:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `DATABASE_URL` | Yes | Runtime PostgreSQL connection string |
+| `DIRECT_URL` | Yes | Direct PostgreSQL URL used by Prisma CLI/migrations |
 | `JWT_SECRET` | Yes | Secret for JWT signing |
 | `RESEND_API_KEY` | No | Resend API key for emails |
 | `RESEND_FROM_EMAIL` | No | Default sender email |
@@ -90,7 +93,7 @@ Create a `.env` file in the root of the `server/` directory:
 
 ---
 
-## � API Reference
+## API Reference
 
 ### Base URL
 `https://api.hiringbull.org/`

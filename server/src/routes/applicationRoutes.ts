@@ -18,7 +18,7 @@ interface PrismaError {
 
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const { full_name, email, phone, social_profile, reason } = req.body;
+    const { full_name, email, phone, social_profile, reason, why_membership } = req.body;
 
     // ✅ Minimal required fields
     if (!full_name || !email || !social_profile || !reason) {
@@ -35,6 +35,7 @@ router.post("/", async (req: Request, res: Response) => {
         email,
         phone: phone || null,
         social_profile,
+        why_membership: why_membership || reason,
         reason,
         status: "PENDING",
       },

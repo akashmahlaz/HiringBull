@@ -212,7 +212,7 @@ export const getOutreachById = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.user!.id;
 
     const outreach = await prisma.outreachRequest.findFirst({
@@ -325,7 +325,7 @@ export const updateOutreachStatus = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { status } = req.body;
 
     if (!["APPROVED", "REJECTED", "SENT"].includes(status)) {

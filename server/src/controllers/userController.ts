@@ -124,8 +124,9 @@ export const getAllUsers = catchAsync(async (_req: Request, res: Response) => {
  *         description: Not found
  */
 export const getUserById = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
   const user = await prisma.user.findUnique({
-    where: { id: req.params.id },
+    where: { id },
   });
   if (!user) {
     const error: AppError = new Error("User not found");

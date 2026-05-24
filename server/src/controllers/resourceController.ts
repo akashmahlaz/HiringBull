@@ -111,7 +111,7 @@ export const getCategoryCounts = catchAsync(
  */
 export const getResourceById = catchAsync(
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.user?.id;
 
     const resource = await prisma.resource.findUnique({
@@ -151,7 +151,7 @@ export const getResourceById = catchAsync(
  */
 export const toggleBookmark = catchAsync(
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.user!.id;
 
     const resource = await prisma.resource.findUnique({ where: { id } });
