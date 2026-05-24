@@ -57,6 +57,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: 'metro',
   },
   plugins: [
+    "expo-status-bar",
     [
       'expo-splash-screen',
       {
