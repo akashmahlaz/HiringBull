@@ -11,6 +11,8 @@ server/bun.lock
 # Env files
 .env
 .env.*
+webs/
+
 
 # Logs
 logs
