@@ -209,10 +209,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="resources"
         options={{
-          tabBarLabel: 'Resources',
+          tabBarLabel: 'Copilot',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'globe' : 'globe-outline'}
+              name={focused ? 'sparkles' : 'sparkles-outline'}
               size={24}
               color={color}
             />

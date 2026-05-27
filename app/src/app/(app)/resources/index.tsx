@@ -1,292 +1,451 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, TextInput } from 'react-native';
-import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
+import * as DocumentPicker from 'expo-document-picker';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  ScrollView,
+  TextInput,
+} from 'react-native';
 
+import { client } from '@/api/common/client';
 import { FocusAwareStatusBar, SafeAreaView, Text, View } from '@/components/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type ResourceItem = {
-  id: string;
-  route: string;
-  title: string;
-  description: string;
-  Icon: React.ComponentType<object>;
-};
+type Step = { text: string; status: 'loading' | 'done' };
+type AnalysisMode = 'match' | 'review';
+
+interface MatchResult {
+  matchScore: number;
+  summary: string;
+  strengths: string[];
+  gaps: string[];
+  suggestions: string[];
+  missingKeywords: string[];
+  improvedBullets: string[];
+}
+
+interface ReviewResult {
+  overallScore: number;
+  summary: string;
+  formatScore: number;
+  contentScore: number;
+  atsScore: number;
+  strengths: string[];
+  issues: string[];
+  suggestions: string[];
+  improvedBullets: string[];
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, (i + 1) * size)
-  );
-}
-
-const C = {
-  green: '#2ec27e',
-  purple: '#7c3aed',
-  amber: '#f5b942',
-  blue: '#3b82f6',
-  teal: '#0d9488',
-};
-
-const ICON = 40;
-
-// ─── Card Icons (SVG) ────────────────────────────────────────────────────────
-function CompensationIcon() {
+function ScoreCircle({ score, label, size = 80 }: { score: number; label?: string; size?: number }) {
+  const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
   return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 40 40" fill="none">
-      <Circle cx="11" cy="11" r="8" stroke={C.green} strokeWidth="1.8" />
-      <Path
-        d="M13.2 8.4c-.6-.6-1.6-.9-2.6-.5-1 .4-1.3 1.5-.6 2 .6.5 2 .4 2.6 1 .7.5.4 1.6-.6 2-1 .4-2 .1-2.6-.5M11 6.4v9.2"
-        stroke={C.green}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <Rect x="22" y="22" width="4" height="10" rx="1" fill={C.green} />
-      <Rect x="28" y="18" width="4" height="14" rx="1" fill={C.green} />
-      <Rect x="34" y="14" width="4" height="18" rx="1" fill={C.green} />
-    </Svg>
-  );
-}
-
-function InterviewExperiencesIcon() {
-  return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 40 40" fill="none">
-      <Path
-        d="M6 8c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4v14c0 2.2-1.8 4-4 4H20l-7 7v-7h-3c-2.2 0-4-1.8-4-4V8z"
-        stroke={C.purple}
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <Circle cx="14" cy="15" r="1.8" fill={C.purple} />
-      <Circle cx="20" cy="15" r="1.8" fill={C.purple} />
-      <Circle cx="26" cy="15" r="1.8" fill={C.purple} />
-    </Svg>
-  );
-}
-
-function AICoachIcon() {
-  return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 40 40" fill="none">
-      <Path
-        d="M22 4c.8 7 2.2 9 6 11.5-3.8 2.5-5.2 4.5-6 11.5-.8-7-2.2-9-6-11.5 3.8-2.5 5.2-4.5 6-11.5z"
-        stroke={C.amber}
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M32 22c.4 3.4 1.2 4.4 3 5.8-1.8 1.4-2.6 2.4-3 5.8-.4-3.4-1.2-4.4-3-5.8 1.8-1.4 2.6-2.4 3-5.8z"
-        stroke={C.amber}
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function QuestionsToSolveIcon() {
-  return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 40 40" fill="none">
-      <Path
-        d="M8 5h17l8 8v22c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V7c0-1.1.9-2 2-2z"
-        stroke={C.blue}
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <Path d="M25 5v8h8" stroke={C.blue} strokeWidth="1.8" strokeLinejoin="round" />
-      <Line x1="12" y1="22" x2="28" y2="22" stroke={C.blue} strokeWidth="1.6" strokeLinecap="round" />
-      <Line x1="12" y1="27" x2="28" y2="27" stroke={C.blue} strokeWidth="1.6" strokeLinecap="round" />
-      <Line x1="12" y1="32" x2="22" y2="32" stroke={C.blue} strokeWidth="1.6" strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function MockInterviewsIcon() {
-  return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 40 40" fill="none">
-      <Circle cx="20" cy="13" r="7" stroke={C.teal} strokeWidth="1.8" />
-      <Path
-        d="M6 36c0-7 6.3-12 14-12s14 5 14 12"
-        stroke={C.teal}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-function OnlineResourcesIcon() {
-  return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 40 40" fill="none">
-      <Circle cx="20" cy="20" r="15" stroke={C.blue} strokeWidth="1.8" />
-      <Ellipse cx="20" cy="20" rx="6" ry="15" stroke={C.blue} strokeWidth="1.5" />
-      <Line x1="5" y1="20" x2="35" y2="20" stroke={C.blue} strokeWidth="1.5" />
-      <Path d="M8 12c4-3 20-3 24 0" stroke={C.blue} strokeWidth="1.5" fill="none" />
-      <Path d="M8 28c4 3 20 3 24 0" stroke={C.blue} strokeWidth="1.5" fill="none" />
-    </Svg>
-  );
-}
-
-// ─── Resource Data ────────────────────────────────────────────────────────────
-const RESOURCES: ResourceItem[] = [
-  {
-    id: 'compensation',
-    route: '/resources/compensation',
-    title: 'Compensation Insights',
-    description: 'Explore salary ranges, perks & company benefits',
-    Icon: CompensationIcon,
-  },
-  {
-    id: 'interview-experiences',
-    route: '/resources/interview-experiences',
-    title: 'Interview Experiences',
-    description: 'Real interview experiences shared by candidates',
-    Icon: InterviewExperiencesIcon,
-  },
-  {
-    id: 'ai-coach',
-    route: '/resources/ai-coach',
-    title: 'AI Interview Coach',
-    description: 'Get AI-powered feedback to improve',
-    Icon: AICoachIcon,
-  },
-  {
-    id: 'questions',
-    route: '/resources/questions',
-    title: 'Questions to Solve',
-    description: 'Practice technical & aptitude questions',
-    Icon: QuestionsToSolveIcon,
-  },
-  {
-    id: 'mock-interviews',
-    route: '/resources/mock-interviews',
-    title: 'Mock Interviews',
-    description: 'Practice with topmate profiles & experts',
-    Icon: MockInterviewsIcon,
-  },
-  {
-    id: 'online-resources',
-    route: '/resources/online-resources',
-    title: 'Online Resources',
-    description: 'Curated blogs, videos & study materials',
-    Icon: OnlineResourcesIcon,
-  },
-];
-
-// ─── Resource Card ────────────────────────────────────────────────────────────
-function ResourceCard({ item }: { item: ResourceItem }) {
-  const router = useRouter();
-  const { Icon, title, description, route } = item;
-
-  return (
-    <Pressable
-      onPress={() => router.push(route as never)}
-      className="h-[200px] flex-1 rounded-2xl border border-neutral-200 bg-white p-4 active:opacity-75"
-      accessibilityRole="button"
-      accessibilityLabel={title}
-    >
-      <View className="mb-3 items-start">
-        <Icon />
-      </View>
-
-      <Text
-        className="mb-1 text-[15px] font-bold leading-[20px] text-neutral-900"
-        numberOfLines={2}
+    <View className="items-center">
+      <View
+        style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 4, borderColor: color }}
+        className="items-center justify-center"
       >
-        {title}
-      </Text>
-
-      <Text
-        className="text-[12px] leading-[17px] text-neutral-500"
-        numberOfLines={3}
-      >
-        {description}
-      </Text>
-
-      <View className="mt-auto items-end">
-        <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+        <Text style={{ color, fontSize: size * 0.3, fontWeight: '800' }}>{score}</Text>
       </View>
-    </Pressable>
+      {label && <Text className="mt-1 text-xs text-neutral-500">{label}</Text>}
+    </View>
+  );
+}
+
+function ThinkingSteps({ steps }: { steps: Step[] }) {
+  return (
+    <View className="mt-4 rounded-2xl border border-neutral-100 bg-neutral-50 p-4">
+      <View className="mb-2 flex-row items-center gap-2">
+        <Ionicons name="sparkles" size={16} color="#7c3aed" />
+        <Text className="text-sm font-semibold text-neutral-700">HiringBull Copilot is thinking...</Text>
+      </View>
+      {steps.map((step, i) => (
+        <View key={i} className="ml-1 mt-2 flex-row items-center gap-2">
+          {step.status === 'done' ? (
+            <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+          ) : (
+            <ActivityIndicator size={14} color="#7c3aed" />
+          )}
+          <Text className={`text-sm ${step.status === 'done' ? 'text-neutral-600' : 'text-neutral-800 font-medium'}`}>
+            {step.text}
+          </Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function Resources() {
-  const [searchQuery, setSearchQuery] = useState('');
+export default function CopilotScreen() {
+  const [resumeText, setResumeText] = useState('');
+  const [resumeFileName, setResumeFileName] = useState('');
+  const [jdText, setJdText] = useState('');
+  const [mode, setMode] = useState<AnalysisMode>('match');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [result, setResult] = useState<MatchResult | ReviewResult | null>(null);
+  const [error, setError] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const filteredResources = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return RESOURCES;
-    return RESOURCES.filter(
-      (r) =>
-        r.title.toLowerCase().includes(query) ||
-        r.description.toLowerCase().includes(query)
-    );
-  }, [searchQuery]);
+  const pickResume = useCallback(async () => {
+    try {
+      const docResult = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/plain', 'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+      });
 
-  const rows = useMemo(
-    () => chunkArray(filteredResources, 2),
-    [filteredResources]
-  );
+      if (docResult.canceled) return;
+
+      const file = docResult.assets[0];
+      setResumeFileName(file.name);
+
+      // For now, read as text if possible. For PDF we'll send to backend.
+      // In production, we'd upload the file and parse server-side.
+      // For MVP, user can paste text OR we extract from the file URI.
+      if (file.mimeType === 'text/plain') {
+        const response = await fetch(file.uri);
+        const text = await response.text();
+        setResumeText(text);
+      } else {
+        // For PDF/DOC, we'll set a placeholder and upload the file
+        setResumeText(`[Uploaded: ${file.name}]`);
+        // TODO: Add actual PDF parsing via server endpoint
+      }
+    } catch (e) {
+      console.error('Document pick error:', e);
+    }
+  }, []);
+
+  const analyze = useCallback(async () => {
+    if (!resumeText.trim()) {
+      setError('Please upload or paste your resume first');
+      return;
+    }
+    if (mode === 'match' && !jdText.trim()) {
+      setError('Please paste the job description for match analysis');
+      return;
+    }
+
+    setError('');
+    setResult(null);
+    setSteps([]);
+    setIsAnalyzing(true);
+    fadeAnim.setValue(0);
+
+    try {
+      const response = await fetch(`${client.defaults.baseURL}/ai/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: client.defaults.headers.Authorization as string || '',
+        },
+        body: JSON.stringify({
+          resume: resumeText,
+          jobDescription: jdText || undefined,
+          mode,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response stream');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(data);
+            if (event.type === 'step') {
+              setSteps((prev) => {
+                const existing = prev.findIndex((s) => s.text === event.step);
+                if (existing >= 0) {
+                  const updated = [...prev];
+                  updated[existing] = { text: event.step, status: event.status };
+                  return updated;
+                }
+                return [...prev, { text: event.step, status: event.status }];
+              });
+            } else if (event.type === 'result') {
+              setResult(event.data);
+              Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+              }).start();
+            } else if (event.type === 'error') {
+              setError(event.message);
+            }
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      setError(e.message || 'Analysis failed. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [resumeText, jdText, mode, fadeAnim]);
+
+  const reset = () => {
+    setResult(null);
+    setSteps([]);
+    setError('');
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <FocusAwareStatusBar />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 40 }}
       >
         <View className="px-5 pb-10">
+          {/* Header */}
           <View className="pb-1 pt-4">
-            <Text className="mb-2 text-[36px] font-extrabold leading-[42px] text-neutral-900">
-              Resources
-            </Text>
-            <Text className="text-[16px] leading-[24px] text-neutral-500">
-              Everything you need to prepare{'\n'}and ace your interviews.
-            </Text>
-          </View>
-
-          <View className="my-6 h-14 flex-row items-center gap-3 rounded-2xl bg-neutral-100 px-4">
-            <Ionicons name="search-outline" size={20} color="#9ca3af" />
-            <TextInput
-              placeholder="Search resources"
-              placeholderTextColor="#9ca3af"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              returnKeyType="search"
-              className="flex-1 p-0 text-[16px] text-neutral-900"
-            />
-            {searchQuery.length > 0 && (
-              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#9ca3af" />
-              </Pressable>
-            )}
-          </View>
-
-          {filteredResources.length === 0 ? (
-            <View className="mt-16 items-center justify-center">
-              <Ionicons name="search-outline" size={48} color="#9ca3af" />
-              <Text className="mt-4 text-center text-base font-semibold text-neutral-500">
-                No resources found
-              </Text>
-              <Text className="mt-1 text-center text-[13px] text-neutral-400">
-                Try a different keyword
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="sparkles" size={28} color="#7c3aed" />
+              <Text className="text-[32px] font-extrabold leading-[38px] text-neutral-900">
+                Copilot
               </Text>
             </View>
-          ) : (
-            rows.map((row, rowIdx) => (
-              <View key={rowIdx} className="mb-4 flex-row gap-4">
-                {row.map((item) => (
-                  <ResourceCard key={item.id} item={item} />
-                ))}
-                {row.length < 2 &&
-                  Array.from({ length: 2 - row.length }).map((_, i) => (
-                    <View key={`ph-${i}`} className="flex-1" />
-                  ))}
+            <Text className="mt-2 text-[15px] leading-[22px] text-neutral-500">
+              AI-powered resume analysis to help you{'\n'}land your dream job.
+            </Text>
+          </View>
+
+          {/* Mode Toggle */}
+          <View className="mt-6 flex-row gap-3">
+            <Pressable
+              onPress={() => { setMode('match'); reset(); }}
+              className={`flex-1 rounded-xl border px-4 py-3 ${mode === 'match' ? 'border-violet-500 bg-violet-50' : 'border-neutral-200 bg-white'}`}
+            >
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="git-compare-outline" size={18} color={mode === 'match' ? '#7c3aed' : '#737373'} />
+                <Text className={`text-sm font-semibold ${mode === 'match' ? 'text-violet-700' : 'text-neutral-600'}`}>
+                  Match with JD
+                </Text>
               </View>
-            ))
+              <Text className="mt-1 text-xs text-neutral-500">Compare resume vs job</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { setMode('review'); reset(); }}
+              className={`flex-1 rounded-xl border px-4 py-3 ${mode === 'review' ? 'border-violet-500 bg-violet-50' : 'border-neutral-200 bg-white'}`}
+            >
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="document-text-outline" size={18} color={mode === 'review' ? '#7c3aed' : '#737373'} />
+                <Text className={`text-sm font-semibold ${mode === 'review' ? 'text-violet-700' : 'text-neutral-600'}`}>
+                  Resume Review
+                </Text>
+              </View>
+              <Text className="mt-1 text-xs text-neutral-500">General quality check</Text>
+            </Pressable>
+          </View>
+
+          {/* Resume Upload */}
+          <View className="mt-6">
+            <Text className="mb-2 text-sm font-semibold text-neutral-700">Your Resume</Text>
+            <Pressable
+              onPress={pickResume}
+              className="flex-row items-center gap-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-4"
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-violet-100">
+                <Ionicons name="cloud-upload-outline" size={20} color="#7c3aed" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-neutral-700">
+                  {resumeFileName || 'Upload Resume'}
+                </Text>
+                <Text className="text-xs text-neutral-400">PDF, DOC, or TXT</Text>
+              </View>
+              {resumeFileName && <Ionicons name="checkmark-circle" size={20} color="#10b981" />}
+            </Pressable>
+
+            <Text className="my-3 text-center text-xs text-neutral-400">— or paste below —</Text>
+            <TextInput
+              placeholder="Paste your resume text here..."
+              placeholderTextColor="#9ca3af"
+              value={resumeText.startsWith('[Uploaded:') ? '' : resumeText}
+              onChangeText={(t) => { setResumeText(t); setResumeFileName(''); }}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+              className="min-h-[120px] rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-800"
+            />
+          </View>
+
+          {/* Job Description (only in match mode) */}
+          {mode === 'match' && (
+            <View className="mt-5">
+              <Text className="mb-2 text-sm font-semibold text-neutral-700">Job Description</Text>
+              <TextInput
+                placeholder="Paste the job description here..."
+                placeholderTextColor="#9ca3af"
+                value={jdText}
+                onChangeText={setJdText}
+                multiline
+                numberOfLines={6}
+                textAlignVertical="top"
+                className="min-h-[120px] rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-800"
+              />
+            </View>
+          )}
+
+          {/* Error */}
+          {error ? (
+            <View className="mt-4 flex-row items-center gap-2 rounded-xl bg-red-50 px-4 py-3">
+              <Ionicons name="alert-circle" size={18} color="#ef4444" />
+              <Text className="flex-1 text-sm text-red-600">{error}</Text>
+            </View>
+          ) : null}
+
+          {/* Analyze Button */}
+          <Pressable
+            onPress={analyze}
+            disabled={isAnalyzing}
+            className={`mt-6 flex-row items-center justify-center gap-2 rounded-xl py-4 ${isAnalyzing ? 'bg-violet-300' : 'bg-violet-600 active:bg-violet-700'}`}
+          >
+            {isAnalyzing ? (
+              <ActivityIndicator size={18} color="#fff" />
+            ) : (
+              <Ionicons name="sparkles" size={18} color="#fff" />
+            )}
+            <Text className="text-base font-bold text-white">
+              {isAnalyzing ? 'Analyzing...' : mode === 'match' ? 'Analyze Match' : 'Review Resume'}
+            </Text>
+          </Pressable>
+
+          {/* Thinking Steps */}
+          {steps.length > 0 && <ThinkingSteps steps={steps} />}
+
+          {/* Results */}
+          {result && (
+            <Animated.View style={{ opacity: fadeAnim }} className="mt-6">
+              {/* Score */}
+              <View className="items-center rounded-2xl border border-neutral-100 bg-gradient-to-b from-violet-50 to-white p-6">
+                <ScoreCircle
+                  score={'matchScore' in result ? (result as MatchResult).matchScore : (result as ReviewResult).overallScore}
+                  label={mode === 'match' ? 'Match Score' : 'Overall Score'}
+                  size={100}
+                />
+                {mode === 'review' && 'formatScore' in result && (
+                  <View className="mt-4 flex-row gap-6">
+                    <ScoreCircle score={(result as ReviewResult).formatScore} label="Format" size={56} />
+                    <ScoreCircle score={(result as ReviewResult).contentScore} label="Content" size={56} />
+                    <ScoreCircle score={(result as ReviewResult).atsScore} label="ATS" size={56} />
+                  </View>
+                )}
+              </View>
+
+              {/* Summary */}
+              <View className="mt-4 rounded-2xl border border-neutral-100 bg-white p-4">
+                <Text className="mb-2 text-sm font-bold text-neutral-800">Summary</Text>
+                <Text className="text-sm leading-5 text-neutral-600">{result.summary}</Text>
+              </View>
+
+              {/* Strengths */}
+              {result.strengths && result.strengths.length > 0 && (
+                <View className="mt-4 rounded-2xl border border-green-100 bg-green-50 p-4">
+                  <View className="mb-2 flex-row items-center gap-2">
+                    <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                    <Text className="text-sm font-bold text-green-800">Strengths</Text>
+                  </View>
+                  {result.strengths.map((s: string, i: number) => (
+                    <Text key={i} className="mt-1 text-sm text-green-700">• {s}</Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Gaps / Issues */}
+              {('gaps' in result ? result.gaps : (result as ReviewResult).issues)?.length > 0 && (
+                <View className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4">
+                  <View className="mb-2 flex-row items-center gap-2">
+                    <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                    <Text className="text-sm font-bold text-red-800">
+                      {mode === 'match' ? 'Gaps' : 'Issues'}
+                    </Text>
+                  </View>
+                  {('gaps' in result ? result.gaps : (result as ReviewResult).issues)?.map((g: string, i: number) => (
+                    <Text key={i} className="mt-1 text-sm text-red-700">• {g}</Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Suggestions */}
+              {result.suggestions && result.suggestions.length > 0 && (
+                <View className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                  <View className="mb-2 flex-row items-center gap-2">
+                    <Ionicons name="bulb-outline" size={16} color="#7c3aed" />
+                    <Text className="text-sm font-bold text-violet-800">Suggestions</Text>
+                  </View>
+                  {result.suggestions.map((s: string, i: number) => (
+                    <Text key={i} className="mt-2 text-sm leading-5 text-violet-700">{i + 1}. {s}</Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Missing Keywords (match mode) */}
+              {'missingKeywords' in result && (result as MatchResult).missingKeywords?.length > 0 && (
+                <View className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                  <View className="mb-2 flex-row items-center gap-2">
+                    <Ionicons name="key-outline" size={16} color="#d97706" />
+                    <Text className="text-sm font-bold text-amber-800">Missing Keywords</Text>
+                  </View>
+                  <View className="flex-row flex-wrap gap-2">
+                    {(result as MatchResult).missingKeywords.map((k: string, i: number) => (
+                      <View key={i} className="rounded-full bg-amber-200 px-3 py-1">
+                        <Text className="text-xs font-medium text-amber-800">{k}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Improved Bullets */}
+              {result.improvedBullets && result.improvedBullets.length > 0 && (
+                <View className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <View className="mb-2 flex-row items-center gap-2">
+                    <Ionicons name="create-outline" size={16} color="#3b82f6" />
+                    <Text className="text-sm font-bold text-blue-800">Improved Bullets (Copy These)</Text>
+                  </View>
+                  {result.improvedBullets.map((b: string, i: number) => (
+                    <View key={i} className="mt-2 rounded-lg bg-white p-3">
+                      <Text className="text-sm leading-5 text-neutral-700">• {b}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Reset */}
+              <Pressable
+                onPress={() => { reset(); setResumeText(''); setJdText(''); setResumeFileName(''); }}
+                className="mt-6 flex-row items-center justify-center gap-2 rounded-xl border border-neutral-200 py-3"
+              >
+                <Ionicons name="refresh-outline" size={18} color="#737373" />
+                <Text className="text-sm font-semibold text-neutral-600">Start New Analysis</Text>
+              </Pressable>
+            </Animated.View>
           )}
         </View>
       </ScrollView>
