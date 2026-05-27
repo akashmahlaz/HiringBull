@@ -13,6 +13,7 @@ import freeJobsRoutes from "./freeJobsRoutes.js";
 import applicationRoutes from "./applicationRoutes.js";
 import membershipRoutes from "./membershipRoutes.js";
 import resourceRoutes from "./resourceRoutes.js";
+import aiRoutes from "./aiRoutes.js";
 
 const router = express.Router();
 
@@ -35,5 +36,6 @@ router.use("/payment", paymentRoutes);
 router.use("/companies", companyRoutes);
 router.use("/web-registration", webRegistrationRoutes);
 router.use("/resources", resourceRoutes);
+router.use("/ai", aiRoutes);
 
 export default router;
