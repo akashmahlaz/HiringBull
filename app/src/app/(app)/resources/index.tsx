@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import { useColorScheme } from 'nativewind';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -85,11 +86,17 @@ function ScoreBar({
 
 // ─── Thinking Steps ───────────────────────────────────────────────────────────
 function ThinkingSteps({ steps }: { steps: Step[] }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   return (
     <View className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <View className="mb-3 flex-row items-center gap-2">
         <View className="size-7 items-center justify-center rounded-full bg-neutral-900 dark:bg-white">
-          <Ionicons name="sparkles" size={13} color="#ffffff" />
+          <Ionicons
+            name="sparkles"
+            size={13}
+            color={isDark ? '#171717' : '#ffffff'}
+          />
         </View>
         <Text className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
           Copilot is thinking…
@@ -100,7 +107,10 @@ function ThinkingSteps({ steps }: { steps: Step[] }) {
           {step.status === 'done' ? (
             <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
           ) : (
-            <ActivityIndicator size={14} color="#171717" />
+            <ActivityIndicator
+              size={14}
+              color={isDark ? '#ffffff' : '#171717'}
+            />
           )}
           <Text
             className={`flex-1 text-sm ${
@@ -158,6 +168,8 @@ function SectionCard({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function CopilotScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [resumeText, setResumeText] = useState('');
   const [resumeFileName, setResumeFileName] = useState('');
   const [jdText, setJdText] = useState('');
@@ -326,7 +338,11 @@ export default function CopilotScreen() {
             Copilot
           </Text>
           <View className="flex-row items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 dark:bg-neutral-800">
-            <Ionicons name="sparkles" size={11} color="#171717" />
+            <Ionicons
+              name="sparkles"
+              size={11}
+              color={isDark ? '#ffffff' : '#171717'}
+            />
             <Text className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
               AI
             </Text>
@@ -363,7 +379,13 @@ export default function CopilotScreen() {
               <Ionicons
                 name="git-compare-outline"
                 size={16}
-                color={mode === 'match' ? '#ffffff' : '#737373'}
+                color={
+                  mode === 'match'
+                    ? isDark
+                      ? '#171717'
+                      : '#ffffff'
+                    : '#737373'
+                }
               />
               <Text
                 className={`text-sm font-semibold ${
@@ -401,7 +423,13 @@ export default function CopilotScreen() {
               <Ionicons
                 name="document-text-outline"
                 size={16}
-                color={mode === 'review' ? '#ffffff' : '#737373'}
+                color={
+                  mode === 'review'
+                    ? isDark
+                      ? '#171717'
+                      : '#ffffff'
+                    : '#737373'
+                }
               />
               <Text
                 className={`text-sm font-semibold ${
@@ -439,7 +467,9 @@ export default function CopilotScreen() {
               <Ionicons
                 name="cloud-upload-outline"
                 size={18}
-                color={resumeFileName ? '#16a34a' : '#ffffff'}
+                color={
+                  resumeFileName ? '#16a34a' : isDark ? '#171717' : '#ffffff'
+                }
               />
             </View>
             <View className="flex-1">
@@ -525,7 +555,7 @@ export default function CopilotScreen() {
             <Ionicons
               name="sparkles"
               size={18}
-              color={isAnalyzing ? '#ffffff' : '#ffffff'}
+              color={isDark ? '#171717' : '#ffffff'}
             />
           )}
           <Text
