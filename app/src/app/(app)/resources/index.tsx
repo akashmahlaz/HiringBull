@@ -227,7 +227,7 @@ export default function CopilotScreen() {
     fadeAnim.setValue(0);
 
     try {
-      const response = await fetch(`${client.defaults.baseURL}/ai/analyze`, {
+      const response = await fetch(`${client.defaults.baseURL}/api/ai/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

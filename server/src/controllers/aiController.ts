@@ -14,31 +14,39 @@ interface AnalyzeRequest {
 /**
  * Call AI API for resume analysis (Minimax primary, OpenAI fallback)
  */
-async function callAI(systemPrompt: string, userPrompt: string): Promise<string> {
+async function callAI(
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<string> {
   // Try Minimax first
   if (MINIMAX_API_KEY) {
-    const response = await fetch("https://api.minimaxi.chat/v1/text/chatcompletion_v2", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${MINIMAX_API_KEY}`,
+    const response = await fetch(
+      "https://api.minimaxi.chat/v1/text/chatcompletion_v2",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${MINIMAX_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: MINIMAX_MODEL,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 4000,
+        }),
       },
-      body: JSON.stringify({
-        model: MINIMAX_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-      }),
-    });
+    );
 
     if (response.ok) {
-      const data = await response.json() as any;
-      return data.choices?.[0]?.message?.content || "Unable to generate analysis.";
+      const data = (await response.json()) as any;
+      return (
+        data.choices?.[0]?.message?.content || "Unable to generate analysis."
+      );
     }
-    log.warn(`Minimax API error: ${response.status}, falling back to OpenAI`);
+    log(`[WARN] Minimax API error: ${response.status}, falling back to OpenAI`);
   }
 
   // Fallback to OpenAI
@@ -62,15 +70,19 @@ async function callAI(systemPrompt: string, userPrompt: string): Promise<string>
 
     if (!response.ok) {
       const errorText = await response.text();
-      log.error(`OpenAI API error: ${response.status} - ${errorText}`);
+      log(`[ERROR] OpenAI API error: ${response.status} - ${errorText}`);
       throw new Error(`AI service unavailable (${response.status})`);
     }
 
-    const data = await response.json() as any;
-    return data.choices?.[0]?.message?.content || "Unable to generate analysis.";
+    const data = (await response.json()) as any;
+    return (
+      data.choices?.[0]?.message?.content || "Unable to generate analysis."
+    );
   }
 
-  throw new Error("No AI provider configured. Set MINIMAX_API_KEY or OPENAI_API_KEY.");
+  throw new Error(
+    "No AI provider configured. Set MINIMAX_API_KEY or OPENAI_API_KEY.",
+  );
 }
 
 /**
@@ -85,7 +97,9 @@ export async function analyzeResume(req: Request, res: Response) {
     }
 
     if (mode === "match" && (!jobDescription || !jobDescription.trim())) {
-      return res.status(400).json({ error: "Job description is required for match mode" });
+      return res
+        .status(400)
+        .json({ error: "Job description is required for match mode" });
     }
 
     // Set up SSE for streaming thinking steps
@@ -158,7 +172,12 @@ Be specific, actionable, and honest. Focus on what would make this resume stand 
     // Call AI
     const analysis = await callAI(systemPrompt, userPrompt);
 
-    sendStep(mode === "match" ? "Analyzing skill match..." : "Checking ATS compatibility...", "done");
+    sendStep(
+      mode === "match"
+        ? "Analyzing skill match..."
+        : "Checking ATS compatibility...",
+      "done",
+    );
     sendStep("Generating recommendations...", "done");
 
     // Parse the AI response
@@ -166,20 +185,26 @@ Be specific, actionable, and honest. Focus on what would make this resume stand 
     try {
       // Try to extract JSON from the response (handle potential markdown wrapping)
       const jsonMatch = analysis.match(/\{[\s\S]*\}/);
-      parsedAnalysis = jsonMatch ? JSON.parse(jsonMatch[0]) : { summary: analysis };
+      parsedAnalysis = jsonMatch
+        ? JSON.parse(jsonMatch[0])
+        : { summary: analysis };
     } catch {
       parsedAnalysis = { summary: analysis };
     }
 
     // Send final result
-    res.write(`data: ${JSON.stringify({ type: "result", data: parsedAnalysis })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({ type: "result", data: parsedAnalysis })}\n\n`,
+    );
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (error: any) {
-    log.error(`AI analyze error: ${error.message}`);
+    log(`[ERROR] AI analyze error: ${error.message}`);
     // If headers already sent (SSE started), send error event
     if (res.headersSent) {
-      res.write(`data: ${JSON.stringify({ type: "error", message: "Analysis failed. Please try again." })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ type: "error", message: "Analysis failed. Please try again." })}\n\n`,
+      );
       res.end();
     } else {
       res.status(500).json({ error: "Analysis failed. Please try again." });
