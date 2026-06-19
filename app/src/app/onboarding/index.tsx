@@ -57,7 +57,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [profileData, setProfileData] = useState<ProfileData>({
     name: '',
-    isExperienced: true,
+    isExperienced: false,
     collegeOrCompany: '',
     cgpaOrYoe: '',
     resumeLink: '',
@@ -148,28 +148,15 @@ export default function Onboarding() {
 
   const handleFinish = () => {
     if (profileData && experienceLevel && selectedCompanies) {
-      let payload = {
+      const payload = {
         name: profileData.name,
-        is_experienced: profileData.isExperienced,
+        is_experienced: false,
         resume_link: profileData.resumeLink,
         experience_level: experienceLevel,
         followedCompanies: selectedCompanies,
+        cgpa: profileData.cgpaOrYoe,
+        college_name: profileData.collegeOrCompany,
       } as UserRegistration;
-
-      if (payload.is_experienced) {
-        payload = {
-          ...payload,
-          is_experienced: true,
-          years_of_experience: Number(profileData.cgpaOrYoe),
-          company_name: profileData.collegeOrCompany,
-        };
-      } else {
-        payload = {
-          ...payload,
-          cgpa: profileData.cgpaOrYoe,
-          college_name: profileData.collegeOrCompany,
-        };
-      }
 
       registerUser(payload, {
         onSuccess: () => {

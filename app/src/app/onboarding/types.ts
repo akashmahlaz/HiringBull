@@ -12,7 +12,6 @@ export type OnboardedCompanies = {
 
 export type ProfileData = {
   name: string;
-  isExperienced: boolean;
   collegeOrCompany: string;
   cgpaOrYoe: string;
   resumeLink: string;

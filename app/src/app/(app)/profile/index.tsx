@@ -89,12 +89,6 @@ export default function Profile() {
   const modalRef = React.useRef<BottomSheetModal>(null);
   const SETTINGS: SettingsItem[] = [
     {
-      label: 'Edit Experience',
-      icon: 'layers-outline',
-      iconColor: '#13803b', // primary-500
-      onPress: () => navigate('/edit-experience'),
-    },
-    {
       label: 'Edit Companies',
       icon: 'business-outline',
       iconColor: '#13803b', // primary-500

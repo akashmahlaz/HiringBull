@@ -347,14 +347,6 @@ export default function Jobs() {
                 Edit Companies
               </Text>
             </Pressable>
-            <Pressable
-              onPress={() => router.push('/edit-experience')}
-              className="flex-row items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2.5"
-            >
-              <Text className="text-sm font-medium text-neutral-700">
-                Edit Experience
-              </Text>
-            </Pressable>
           </View> */}
         </View>
 

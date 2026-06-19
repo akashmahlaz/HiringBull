@@ -108,10 +108,25 @@ export default function PaymentScreen() {
   const [purchasing, setPurchasing] = useState(false);
   const [connectionReady, setConnectionReady] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [shouldNavigate, setShouldNavigate] = useState(false);
   const [purchasedPlanId, setPurchasedPlanId] = useState<string | null>(null);
   const purchaseProcessed = useRef(false);
   const purchaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasNavigatedRef = useRef(false);
+
+  // Helper: navigate to root after successful purchase (or restore).
+  // Uses a ref to guard against double-navigation. Bypasses state-based
+  // useEffect which can stall if the screen is in the process of unmounting.
+  const navigateAfterPurchase = useCallback(() => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    console.log(
+      `${TAG} navigateAfterPurchase: replacing to / (guards will resolve to (app))`
+    );
+    // Small delay so the user sees the "Plan Activated" confirmation briefly
+    setTimeout(() => {
+      router.replace('/');
+    }, 600);
+  }, [router]);
 
   // On mount, check if user already has an active membership
   useEffect(() => {
@@ -121,20 +136,6 @@ export default function PaymentScreen() {
       router.replace('/');
     }
   }, []);
-
-  // Navigate via state change so router is never stale
-  // IMPORTANT: Use '/' not '/(app)' — group routes like (app) resolve incorrectly
-  // with Stack.Protected because path resolution picks the first empty-path match
-  // (e.g. onboarding) before guards are evaluated. Using '/' lets the root layout
-  // guards decide the correct screen, same as login.tsx does.
-  useEffect(() => {
-    if (shouldNavigate) {
-      console.log(
-        `${TAG} Navigating to / via state trigger (guards will resolve to (app))`
-      );
-      router.replace('/');
-    }
-  }, [shouldNavigate, router]);
 
   // ─── Initialize IAP connection ────────────────────────────
   useEffect(() => {
@@ -259,7 +260,7 @@ export default function PaymentScreen() {
           // Navigate immediately — don't wait for Alert interaction
           setPurchasing(false);
           setPurchasedPlanId(purchase.productId);
-          setShouldNavigate(true);
+          navigateAfterPurchase();
         } else {
           throw new Error('Server verification failed');
         }
@@ -360,10 +361,11 @@ export default function PaymentScreen() {
             });
             await finishTransaction({ purchase, isConsumable: true });
             verified = true;
+            setPurchasedPlanId(purchase.productId);
             Alert.alert(
               'Purchase Restored! 🎉',
               `Your ${plan?.name || ''} plan is now active.`,
-              [{ text: 'Continue', onPress: () => setShouldNavigate(true) }]
+              [{ text: 'Continue', onPress: () => navigateAfterPurchase() }]
             );
             break;
           }
@@ -467,7 +469,7 @@ export default function PaymentScreen() {
             });
             setPurchasing(false);
             setPurchasedPlanId(plan.id);
-            setShouldNavigate(true);
+            navigateAfterPurchase();
           } else {
             console.log(
               `${TAG} Server shows no active membership yet, keeping user on payment screen.`
@@ -524,7 +526,7 @@ export default function PaymentScreen() {
             }
             setPurchasing(false);
             setPurchasedPlanId(plan.id);
-            setShouldNavigate(true);
+            navigateAfterPurchase();
             return;
           }
         } catch (serverErr: any) {

@@ -239,10 +239,6 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={hasCompletedOnboarding}>
           <Stack.Screen
-            name="edit-experience"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
             name="edit-companies"
             options={{ headerShown: false }}
           />

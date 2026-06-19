@@ -4,7 +4,7 @@ import { Pressable, type TextInput } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { ProfileData } from '@/app/onboarding/types';
-import { Checkbox, Input, Text, View } from '@/components/ui';
+import { Input, Text, View } from '@/components/ui';
 
 import { StepperControls } from './StepperInput';
 
@@ -69,28 +69,13 @@ function Step0({ data, onChange, onContinue, canContinue }: Props) {
               blurOnSubmit={false}
             />
           </View>
-          <Pressable
-            onPress={() => updateField('isExperienced', !data.isExperienced)}
-            className="flex-row items-center gap-3 py-2"
-          >
-            <Checkbox
-              checked={data.isExperienced}
-              onChange={() => updateField('isExperienced', !data.isExperienced)}
-              accessibilityLabel="I am an experienced professional"
-            />
-            <Text className="text-base text-neutral-900 dark:text-white">
-              I am an experienced professional
-            </Text>
-          </Pressable>
           <View>
             <Text className="mb-2 font-medium text-neutral-900 dark:text-white">
-              {data.isExperienced ? 'Current Company' : 'College Name'}
+              College Name
             </Text>
             <Input
               ref={collegeOrCompanyRef}
-              placeholder={
-                data.isExperienced ? 'e.g. Google' : 'e.g. IIT Delhi'
-              }
+              placeholder="e.g. IIT Delhi"
               value={data.collegeOrCompany}
               onChangeText={(text) => updateField('collegeOrCompany', text)}
               returnKeyType="next"
@@ -101,12 +86,12 @@ function Step0({ data, onChange, onContinue, canContinue }: Props) {
 
           <View>
             <Text className="mb-2 font-medium text-neutral-900 dark:text-white">
-              {data.isExperienced ? 'Years of Experience' : 'CGPA / Percentage'}
+              CGPA / Percentage
             </Text>
             <View className="relative">
               <Input
                 ref={cgpaOrYoeRef}
-                placeholder={data.isExperienced ? 'e.g. 0.5' : 'e.g. 8.5'}
+                placeholder="e.g. 8.5"
                 value={data.cgpaOrYoe}
                 keyboardType="decimal-pad"
                 onChangeText={(text) => {
@@ -145,7 +130,7 @@ function Step0({ data, onChange, onContinue, canContinue }: Props) {
               onSubmitEditing={handleSubmit}
             />
           </View>
-          
+
         </View>
       </KeyboardAwareScrollView>
     </View>

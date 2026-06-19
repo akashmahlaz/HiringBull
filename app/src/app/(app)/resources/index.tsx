@@ -16,7 +16,6 @@ import { FocusAwareStatusBar, SafeAreaView, Text, View } from '@/components/ui';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Step = { text: string; status: 'loading' | 'done' };
-type AnalysisMode = 'match' | 'review';
 
 interface MatchResult {
   matchScore: number;
@@ -28,61 +27,13 @@ interface MatchResult {
   improvedBullets: string[];
 }
 
-interface ReviewResult {
-  overallScore: number;
-  summary: string;
-  formatScore: number;
-  contentScore: number;
-  atsScore: number;
-  strengths: string[];
-  issues: string[];
-  suggestions: string[];
-  improvedBullets: string[];
-}
-
-// ─── Score Bar Component ──────────────────────────────────────────────────────
-function ScoreBar({
-  score,
-  label,
-  size = 'md',
-}: {
-  score: number;
-  label: string;
-  size?: 'sm' | 'md' | 'lg';
-}) {
-  const color = score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626';
-  const trackH = size === 'lg' ? 10 : size === 'md' ? 7 : 5;
-  const numSz = size === 'lg' ? 40 : size === 'md' ? 28 : 22;
-  const lblSz = size === 'lg' ? 'text-sm' : 'text-xs';
-
-  return (
-    <View className="mb-1">
-      <View className="mb-1.5 flex-row items-center justify-between">
-        <Text
-          className={`${lblSz} font-semibold text-neutral-700 dark:text-neutral-200`}
-        >
-          {label}
-        </Text>
-        <Text style={{ color, fontSize: numSz * 0.55, fontWeight: '800' }}>
-          {score}
-        </Text>
-      </View>
-      <View
-        className="w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800"
-        style={{ height: trackH }}
-      >
-        <RNView
-          style={{
-            width: `${score}%`,
-            height: trackH,
-            backgroundColor: color,
-            borderRadius: 999,
-          }}
-        />
-      </View>
-    </View>
-  );
-}
+const THINKING_PIPELINE: Step[] = [
+  { text: 'Reading your resume and identifying key skills…', status: 'loading' },
+  { text: 'Analyzing the job description for required skills…', status: 'loading' },
+  { text: 'Matching your experience against job requirements…', status: 'loading' },
+  { text: 'Finding gaps and missing keywords…', status: 'loading' },
+  { text: 'Crafting personalized suggestions and improved bullets…', status: 'loading' },
+];
 
 // ─── Thinking Steps ───────────────────────────────────────────────────────────
 function ThinkingSteps({ steps }: { steps: Step[] }) {
@@ -173,10 +124,9 @@ export default function CopilotScreen() {
   const [resumeText, setResumeText] = useState('');
   const [resumeFileName, setResumeFileName] = useState('');
   const [jdText, setJdText] = useState('');
-  const [mode, setMode] = useState<AnalysisMode>('match');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [result, setResult] = useState<MatchResult | ReviewResult | null>(null);
+  const [steps, setSteps] = useState<Step[]>(THINKING_PIPELINE);
+  const [result, setResult] = useState<MatchResult | null>(null);
   const [error, setError] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -199,11 +149,40 @@ export default function CopilotScreen() {
       setResumeFileName(file.name);
 
       if (file.mimeType === 'text/plain') {
+        // TXT: read directly in the app
         const response = await fetch(file.uri);
         const text = await response.text();
         setResumeText(text);
       } else {
-        setResumeText(`[Uploaded: ${file.name}]`);
+        // PDF/DOC: upload to server for text extraction
+        try {
+          const formData = new FormData();
+          formData.append('file', {
+            uri: file.uri,
+            name: file.name,
+            type: file.mimeType,
+          } as any);
+
+          const parseRes = await fetch(
+            `${client.defaults.baseURL}/api/ai/parse-file`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
+
+          if (parseRes.ok) {
+            const { text } = await parseRes.json();
+            setResumeText(text);
+          } else {
+            const err = await parseRes.json();
+            setError(err.error || 'Could not extract text from this file. Try pasting your resume text below.');
+            setResumeText('');
+          }
+        } catch {
+          setError('Could not parse file. Please paste your resume text below.');
+          setResumeText('');
+        }
       }
     } catch (e) {
       console.error('Document pick error:', e);
@@ -215,16 +194,41 @@ export default function CopilotScreen() {
       setError('Please upload or paste your resume first');
       return;
     }
-    if (mode === 'match' && !jdText.trim()) {
+    if (resumeText.startsWith('[Uploaded:')) {
+      setError(
+        'PDF/DOC files cannot be read directly. Please paste your resume text in the text box below.'
+      );
+      return;
+    }
+    if (!jdText.trim()) {
       setError('Please paste the job description for match analysis');
       return;
     }
 
     setError('');
     setResult(null);
-    setSteps([]);
+    setSteps(THINKING_PIPELINE.map((s) => ({ ...s, status: 'loading' })));
     setIsAnalyzing(true);
     fadeAnim.setValue(0);
+
+    // Simulate progressive step completion while waiting for server
+    let stepIdx = 0;
+    const stepInterval = setInterval(() => {
+      stepIdx += 1;
+      if (stepIdx >= THINKING_PIPELINE.length) {
+        clearInterval(stepInterval);
+        return;
+      }
+      setSteps((prev) => {
+        const updated = [...prev];
+        for (let i = 0; i < updated.length; i++) {
+          if (i < stepIdx) updated[i] = { ...updated[i], status: 'done' };
+          else if (i === stepIdx) updated[i] = { ...updated[i], status: 'loading' };
+          else updated[i] = { ...updated[i], status: 'loading' };
+        }
+        return updated;
+      });
+    }, 1800);
 
     try {
       const response = await fetch(`${client.defaults.baseURL}/api/ai/analyze`, {
@@ -237,7 +241,7 @@ export default function CopilotScreen() {
         body: JSON.stringify({
           resume: resumeText,
           jobDescription: jdText || undefined,
-          mode,
+          mode: 'match',
         }),
       });
 
@@ -281,6 +285,8 @@ export default function CopilotScreen() {
               });
             } else if (event.type === 'result') {
               setResult(event.data);
+              // Mark all steps done
+              setSteps((prev) => prev.map((s) => ({ ...s, status: 'done' })));
               Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 500,
@@ -295,21 +301,18 @@ export default function CopilotScreen() {
     } catch (e: any) {
       setError(e.message || 'Analysis failed. Please try again.');
     } finally {
+      clearInterval(stepInterval);
       setIsAnalyzing(false);
     }
-  }, [resumeText, jdText, mode, fadeAnim]);
+  }, [resumeText, jdText, fadeAnim]);
 
   const reset = () => {
     setResult(null);
-    setSteps([]);
+    setSteps(THINKING_PIPELINE);
     setError('');
   };
 
-  const mainScore = result
-    ? 'matchScore' in result
-      ? (result as MatchResult).matchScore
-      : (result as ReviewResult).overallScore
-    : 0;
+  const mainScore = result ? result.matchScore : 0;
 
   const scoreColor =
     mainScore >= 75 ? '#16a34a' : mainScore >= 50 ? '#d97706' : '#dc2626';
@@ -349,8 +352,7 @@ export default function CopilotScreen() {
           </View>
         </View>
         <Text className="mt-2 text-base text-neutral-500 dark:text-neutral-400">
-          Analyse your resume against any job description or get a quality
-          review.
+          Analyse your resume against any job description and get a personalised match score, gaps and improved bullet points.
         </Text>
       </View>
 
@@ -362,95 +364,30 @@ export default function CopilotScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48 }}
       >
-        {/* Mode Toggle */}
-        <View className="mt-4 flex-row gap-3">
-          <Pressable
-            onPress={() => {
-              setMode('match');
-              reset();
-            }}
-            className={`flex-1 rounded-xl border px-4 py-3 ${
-              mode === 'match'
-                ? 'border-neutral-900 bg-neutral-900 dark:border-white dark:bg-white'
-                : 'border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900'
-            }`}
-          >
-            <View className="flex-row items-center gap-2">
+        {/* Mode label — only Match with JD available */}
+        <View className="mt-4 flex-row items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900">
+          <View className="flex-row items-center gap-2">
+            <View className="size-7 items-center justify-center rounded-full bg-neutral-900 dark:bg-white">
               <Ionicons
                 name="git-compare-outline"
-                size={16}
-                color={
-                  mode === 'match'
-                    ? isDark
-                      ? '#171717'
-                      : '#ffffff'
-                    : '#737373'
-                }
+                size={14}
+                color={isDark ? '#171717' : '#ffffff'}
               />
-              <Text
-                className={`text-sm font-semibold ${
-                  mode === 'match'
-                    ? 'text-white dark:text-neutral-900'
-                    : 'text-neutral-600 dark:text-neutral-300'
-                }`}
-              >
+            </View>
+            <View>
+              <Text className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                 Match with JD
               </Text>
-            </View>
-            <Text
-              className={`mt-1 text-xs ${
-                mode === 'match'
-                  ? 'text-neutral-300 dark:text-neutral-600'
-                  : 'text-neutral-400 dark:text-neutral-500'
-              }`}
-            >
-              Compare resume vs job
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              setMode('review');
-              reset();
-            }}
-            className={`flex-1 rounded-xl border px-4 py-3 ${
-              mode === 'review'
-                ? 'border-neutral-900 bg-neutral-900 dark:border-white dark:bg-white'
-                : 'border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900'
-            }`}
-          >
-            <View className="flex-row items-center gap-2">
-              <Ionicons
-                name="document-text-outline"
-                size={16}
-                color={
-                  mode === 'review'
-                    ? isDark
-                      ? '#171717'
-                      : '#ffffff'
-                    : '#737373'
-                }
-              />
-              <Text
-                className={`text-sm font-semibold ${
-                  mode === 'review'
-                    ? 'text-white dark:text-neutral-900'
-                    : 'text-neutral-600 dark:text-neutral-300'
-                }`}
-              >
-                Resume Review
+              <Text className="text-xs text-neutral-500 dark:text-neutral-400">
+                Compare your resume against a job description
               </Text>
             </View>
-            <Text
-              className={`mt-1 text-xs ${
-                mode === 'review'
-                  ? 'text-neutral-300 dark:text-neutral-600'
-                  : 'text-neutral-400 dark:text-neutral-500'
-              }`}
-            >
-              General quality check
+          </View>
+          <View className="rounded-full bg-neutral-100 px-2.5 py-0.5 dark:bg-neutral-800">
+            <Text className="text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+              Active
             </Text>
-          </Pressable>
+          </View>
         </View>
 
         {/* Resume Upload */}
@@ -474,10 +411,10 @@ export default function CopilotScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
-                {resumeFileName || 'Upload Resume'}
+                {resumeFileName || 'Upload Resume (TXT only)'}
               </Text>
               <Text className="text-xs text-neutral-400 dark:text-neutral-500">
-                PDF, DOC, or TXT
+                For PDF/DOC — paste text below
               </Text>
             </View>
             {resumeFileName ? (
@@ -511,23 +448,21 @@ export default function CopilotScreen() {
         </View>
 
         {/* Job Description */}
-        {mode === 'match' && (
-          <View className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-            <Text className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">
-              Job Description
-            </Text>
-            <TextInput
-              placeholder="Paste the job description here…"
-              placeholderTextColor="#a3a3a3"
-              value={jdText}
-              onChangeText={setJdText}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-              className="min-h-[120px] rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-            />
-          </View>
-        )}
+        <View className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <Text className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">
+            Job Description
+          </Text>
+          <TextInput
+            placeholder="Paste the job description here…"
+            placeholderTextColor="#a3a3a3"
+            value={jdText}
+            onChangeText={setJdText}
+            multiline
+            numberOfLines={6}
+            textAlignVertical="top"
+            className="min-h-[120px] rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
+          />
+        </View>
 
         {/* Error */}
         {error ? (
@@ -563,16 +498,12 @@ export default function CopilotScreen() {
               isAnalyzing ? 'text-white' : 'text-white dark:text-neutral-900'
             }`}
           >
-            {isAnalyzing
-              ? 'Analysing…'
-              : mode === 'match'
-                ? 'Analyse Match'
-                : 'Review Resume'}
+            {isAnalyzing ? 'Analysing…' : 'Analyse Match'}
           </Text>
         </Pressable>
 
-        {/* Thinking Steps */}
-        {steps.length > 0 && <ThinkingSteps steps={steps} />}
+        {/* Thinking Steps — visible while analysing or before any result */}
+        {(isAnalyzing || !result) && <ThinkingSteps steps={steps} />}
 
         {/* ─── Results ─── */}
         {result && (
@@ -587,7 +518,7 @@ export default function CopilotScreen() {
                 <View className="flex-row items-center justify-between">
                   <View>
                     <Text className="text-xs font-medium uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                      {mode === 'match' ? 'Match Score' : 'Overall Score'}
+                      Match Score
                     </Text>
                     <View className="mt-1 flex-row items-end gap-1">
                       <Text
@@ -670,26 +601,8 @@ export default function CopilotScreen() {
                   </View>
                 </View>
 
-                {/* Sub-scores (review mode) */}
-                {mode === 'review' && 'formatScore' in result && (
-                  <View className="mt-5 gap-3">
-                    <ScoreBar
-                      score={(result as ReviewResult).formatScore}
-                      label="Format"
-                      size="sm"
-                    />
-                    <ScoreBar
-                      score={(result as ReviewResult).contentScore}
-                      label="Content"
-                      size="sm"
-                    />
-                    <ScoreBar
-                      score={(result as ReviewResult).atsScore}
-                      label="ATS Compatibility"
-                      size="sm"
-                    />
-                  </View>
-                )}
+                {/* Sub-scores (review mode) — disabled, only match with JD */}
+                {/* (no sub-scores — match with JD only) */}
               </View>
             </View>
 
@@ -726,21 +639,17 @@ export default function CopilotScreen() {
               </SectionCard>
             )}
 
-            {/* Gaps / Issues */}
-            {('gaps' in result ? result.gaps : (result as ReviewResult).issues)
-              ?.length > 0 && (
+            {/* Gaps */}
+            {result.gaps && result.gaps.length > 0 && (
               <SectionCard
                 icon="alert-circle"
                 iconBg="#fee2e2"
                 iconColor="#dc2626"
-                title={mode === 'match' ? 'Gaps' : 'Issues'}
+                title="Gaps"
                 titleColor="#b91c1c"
                 borderColor="#fecaca"
               >
-                {('gaps' in result
-                  ? result.gaps
-                  : (result as ReviewResult).issues
-                )?.map((g: string, i: number) => (
+                {result.gaps.map((g: string, i: number) => (
                   <View key={i} className="mt-2 flex-row gap-2">
                     <Text className="text-sm text-danger-500">✕</Text>
                     <Text className="flex-1 text-sm leading-[20px] text-danger-700 dark:text-danger-300">
@@ -780,32 +689,29 @@ export default function CopilotScreen() {
             )}
 
             {/* Missing Keywords */}
-            {'missingKeywords' in result &&
-              (result as MatchResult).missingKeywords?.length > 0 && (
-                <SectionCard
-                  icon="key-outline"
-                  iconBg="#fef3c7"
-                  iconColor="#d97706"
-                  title="Missing Keywords"
-                  titleColor="#92400e"
-                  borderColor="#fde68a"
-                >
-                  <View className="mt-2 flex-row flex-wrap gap-2">
-                    {(result as MatchResult).missingKeywords.map(
-                      (k: string, i: number) => (
-                        <View
-                          key={i}
-                          className="rounded-full border border-warning-300 bg-warning-100 px-3 py-1 dark:border-warning-700 dark:bg-warning-900/50"
-                        >
-                          <Text className="text-xs font-semibold text-warning-800 dark:text-warning-200">
-                            {k}
-                          </Text>
-                        </View>
-                      )
-                    )}
-                  </View>
-                </SectionCard>
-              )}
+            {result.missingKeywords && result.missingKeywords.length > 0 && (
+              <SectionCard
+                icon="key-outline"
+                iconBg="#fef3c7"
+                iconColor="#d97706"
+                title="Missing Keywords"
+                titleColor="#92400e"
+                borderColor="#fde68a"
+              >
+                <View className="mt-2 flex-row flex-wrap gap-2">
+                  {result.missingKeywords.map((k: string, i: number) => (
+                    <View
+                      key={i}
+                      className="rounded-full border border-warning-300 bg-warning-100 px-3 py-1 dark:border-warning-700 dark:bg-warning-900/50"
+                    >
+                      <Text className="text-xs font-semibold text-warning-800 dark:text-warning-200">
+                        {k}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </SectionCard>
+            )}
 
             {/* Improved Bullets */}
             {result.improvedBullets && result.improvedBullets.length > 0 && (

@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import { log } from "../utils/logger.js";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse");
+import mammoth from "mammoth";
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
@@ -209,5 +212,62 @@ Be specific, actionable, and honest. Focus on what would make this resume stand 
     } else {
       res.status(500).json({ error: "Analysis failed. Please try again." });
     }
+  }
+}
+
+/**
+ * POST /api/ai/parse-file
+ * Accepts a file upload (PDF, DOCX, TXT) and extracts text content
+ */
+export async function parseResumeFile(req: Request, res: Response) {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const mimeType = file.mimetype;
+    let text = "";
+
+    if (
+      mimeType === "application/pdf" ||
+      mimeType === "text/plain"
+    ) {
+      // PDF or plain text
+      const buffer = Buffer.from(file.buffer);
+      if (mimeType === "text/plain") {
+        text = buffer.toString("utf-8");
+      } else {
+        const parsed = await pdfParse(buffer);
+        text = parsed.text;
+      }
+    } else if (
+      mimeType ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      mimeType ===
+        "application/msword"
+    ) {
+      // DOCX or DOC
+      const result = await mammoth.extractRawText({ buffer: file.buffer });
+      text = result.value;
+    } else {
+      return res.status(400).json({
+        error: `Unsupported file type: ${mimeType}. Please upload a PDF, DOC, DOCX, or TXT file.`,
+      });
+    }
+
+    if (!text || !text.trim()) {
+      return res.status(422).json({
+        error: "Could not extract any text from this file. Try copying and pasting your resume content instead.",
+      });
+    }
+
+    log(`[AI] Parsed file ${file.originalname} (${text.length} chars)`);
+    res.json({ text: text.trim() });
+  } catch (error: any) {
+    log(`[ERROR] parseResumeFile: ${error.message}`);
+    res.status(500).json({
+      error: "Failed to parse file. Try copying and pasting your resume text instead.",
+    });
   }
 }
