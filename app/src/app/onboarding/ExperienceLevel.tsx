@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Pressable, type TextInput } from 'react-native';
+import { type TextInput } from 'react-native';
 // import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 

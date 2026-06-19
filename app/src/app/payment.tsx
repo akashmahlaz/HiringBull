@@ -4,6 +4,7 @@ import {
   Ionicons,
   MaterialCommunityIcons,
 } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
@@ -101,6 +102,7 @@ export default function PaymentScreen() {
   console.log('[PaymentScreen] Screen rendered');
   const router = useRouter();
   const { signOut } = useAuth();
+  const queryClient = useQueryClient();
 
   const [selectedPlan, setSelectedPlan] = useState(PLANS[1].id); // default Growth
   const [products, setProducts] = useState<Product[]>([]);
@@ -116,17 +118,20 @@ export default function PaymentScreen() {
   // Helper: navigate to root after successful purchase (or restore).
   // Uses a ref to guard against double-navigation. Bypasses state-based
   // useEffect which can stall if the screen is in the process of unmounting.
+  // Also invalidates cached "users me" data so guards see the new membership.
   const navigateAfterPurchase = useCallback(() => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
     console.log(
-      `${TAG} navigateAfterPurchase: replacing to / (guards will resolve to (app))`
+      `${TAG} navigateAfterPurchase: invalidating users cache and replacing to /`
     );
+    // Make sure the next screen re-fetches user info with the new membership.
+    queryClient.invalidateQueries({ queryKey: ['users', 'me'] });
     // Small delay so the user sees the "Plan Activated" confirmation briefly
     setTimeout(() => {
       router.replace('/');
     }, 600);
-  }, [router]);
+  }, [router, queryClient]);
 
   // On mount, check if user already has an active membership
   useEffect(() => {
