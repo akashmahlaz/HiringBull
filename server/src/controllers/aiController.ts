@@ -10,8 +10,8 @@ const MINIMAX_MODEL = "MiniMax-M2.7";
 
 interface AnalyzeRequest {
   resume: string;
-  jobDescription?: string;
-  mode: "match" | "review";
+  jobDescription: string;
+  mode: "match";
 }
 
 /**
@@ -90,16 +90,24 @@ async function callAI(
 
 /**
  * POST /api/ai/analyze
+ * Body: { resume: string, jobDescription: string, mode: "match" }
+ * Streams thinking steps + final result via SSE.
  */
 export async function analyzeResume(req: Request, res: Response) {
   try {
     const { resume, jobDescription, mode } = req.body as AnalyzeRequest;
 
+    if (mode !== "match") {
+      return res
+        .status(400)
+        .json({ error: "Only 'match' mode is supported." });
+    }
+
     if (!resume || !resume.trim()) {
       return res.status(400).json({ error: "Resume text is required" });
     }
 
-    if (mode === "match" && (!jobDescription || !jobDescription.trim())) {
+    if (!jobDescription || !jobDescription.trim()) {
       return res
         .status(400)
         .json({ error: "Job description is required for match mode" });
@@ -117,31 +125,23 @@ export async function analyzeResume(req: Request, res: Response) {
     };
 
     sendStep("Reading your resume...", "loading");
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 600));
     sendStep("Reading your resume...", "done");
 
-    if (mode === "match") {
-      sendStep("Parsing job requirements...", "loading");
-      await new Promise((r) => setTimeout(r, 600));
-      sendStep("Parsing job requirements...", "done");
+    sendStep("Parsing job requirements...", "loading");
+    await new Promise((r) => setTimeout(r, 600));
+    sendStep("Parsing job requirements...", "done");
 
-      sendStep("Analyzing skill match...", "loading");
-      await new Promise((r) => setTimeout(r, 400));
-    } else {
-      sendStep("Evaluating resume quality...", "loading");
-      await new Promise((r) => setTimeout(r, 600));
-      sendStep("Evaluating resume quality...", "done");
+    sendStep("Matching your experience against job requirements...", "loading");
+    await new Promise((r) => setTimeout(r, 500));
+    sendStep("Matching your experience against job requirements...", "done");
 
-      sendStep("Checking ATS compatibility...", "loading");
-      await new Promise((r) => setTimeout(r, 400));
-    }
+    sendStep("Finding gaps and missing keywords...", "loading");
+    await new Promise((r) => setTimeout(r, 400));
+    sendStep("Finding gaps and missing keywords...", "done");
 
     // Build prompts
-    let systemPrompt: string;
-    let userPrompt: string;
-
-    if (mode === "match") {
-      systemPrompt = `You are HiringBull Copilot, an expert career advisor AI. Analyze the candidate's resume against the provided job description. Return a JSON object (no markdown, no code fences) with this exact structure:
+    const systemPrompt = `You are HiringBull Copilot, an expert career advisor AI. Analyze the candidate's resume against the provided job description. Return a JSON object (no markdown, no code fences) with this exact structure:
 {
   "matchScore": <number 0-100>,
   "summary": "<one paragraph overall assessment>",
@@ -153,47 +153,14 @@ export async function analyzeResume(req: Request, res: Response) {
 }
 Be specific, actionable, and honest. Focus on what would actually help the candidate land this specific role.`;
 
-      userPrompt = `RESUME:\n${resume}\n\nJOB DESCRIPTION:\n${jobDescription}`;
-    } else {
-      systemPrompt = `You are HiringBull Copilot, an expert career advisor AI. Review the candidate's resume for overall quality, ATS-friendliness, and impact. Return a JSON object (no markdown, no code fences) with this exact structure:
-{
-  "overallScore": <number 0-100>,
-  "summary": "<one paragraph overall assessment>",
-  "formatScore": <number 0-100>,
-  "contentScore": <number 0-100>,
-  "atsScore": <number 0-100>,
-  "strengths": ["<strength 1>", "<strength 2>", ...],
-  "issues": ["<issue 1>", "<issue 2>", ...],
-  "suggestions": ["<actionable suggestion 1>", "<actionable suggestion 2>", ...],
-  "improvedBullets": ["<rewritten bullet 1>", "<rewritten bullet 2>", ...]
-}
-Be specific, actionable, and honest. Focus on what would make this resume stand out.`;
-
-      userPrompt = `RESUME:\n${resume}`;
-    }
+    const userPrompt = `RESUME:\n${resume}\n\nJOB DESCRIPTION:\n${jobDescription}`;
 
     // Call AI
     const analysis = await callAI(systemPrompt, userPrompt);
 
-    sendStep(
-      mode === "match"
-        ? "Analyzing skill match..."
-        : "Checking ATS compatibility...",
-      "done",
-    );
-    sendStep("Generating recommendations...", "done");
-
-    // Parse the AI response
-    let parsedAnalysis: any;
-    try {
-      // Try to extract JSON from the response (handle potential markdown wrapping)
-      const jsonMatch = analysis.match(/\{[\s\S]*\}/);
-      parsedAnalysis = jsonMatch
-        ? JSON.parse(jsonMatch[0])
-        : { summary: analysis };
-    } catch {
-      parsedAnalysis = { summary: analysis };
-    }
+    sendStep("Crafting personalized suggestions and improved bullets...", "loading");
+    const parsedAnalysis = parseAnalysis(analysis);
+    sendStep("Crafting personalized suggestions and improved bullets...", "done");
 
     // Send final result
     res.write(
@@ -213,6 +180,20 @@ Be specific, actionable, and honest. Focus on what would make this resume stand 
       res.status(500).json({ error: "Analysis failed. Please try again." });
     }
   }
+}
+
+/**
+ * Safely extract a JSON object from the AI response text.
+ * Falls back to wrapping the text in `{ summary }` if parsing fails.
+ */
+function parseAnalysis(analysis: string): Record<string, unknown> {
+  try {
+    const jsonMatch = analysis.match(/\{[\s\S]*\}/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+  } catch {
+    /* fall through */
+  }
+  return { summary: analysis };
 }
 
 /**

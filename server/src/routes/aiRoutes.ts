@@ -18,8 +18,8 @@ const upload = multer({
 
 /**
  * POST /api/ai/analyze
- * Body: { resume: string, jobDescription?: string, mode: "match" | "review" }
- * Returns: AI analysis with streaming-style chunked response
+ * Body: { resume: string, jobDescription: string, mode: "match" }
+ * Streams thinking steps + final result via SSE
  */
 router.post("/analyze", skipAuth, analyzeResume);
 
